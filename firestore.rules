@@ -1,0 +1,602 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // HELPER FUNCTIONS
+    // ============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function hasRole(roles) {
+      return isAuthenticated() && getUserRole() in roles;
+    }
+
+    function isHRorAdmin() {
+      return hasRole(['HR', 'ADMIN']);
+    }
+
+    function isManager() {
+      return hasRole(['MANAGER', 'HR', 'ADMIN']);
+    }
+
+    function isReviewer() {
+      return hasRole(['MANAGER', 'ADMIN', 'HR']);
+    }
+
+    function isActiveAccount() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status in ['ACTIVE', 'ON_LEAVE'];
+    }
+
+    // Check if target user's manager is the authenticated user
+    function isManagerOf(targetUid) {
+      return isAuthenticated() && isManager() &&
+        get(/databases/$(database)/documents/users/$(targetUid)).data.managerId == request.auth.uid;
+    }
+
+    // ============================================================
+    // 1. USERS / EMPLOYEES
+    // ============================================================
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == uid ||
+        isHRorAdmin() ||
+        isManagerOf(uid)
+      );
+
+      // Only HR can create employee accounts
+      allow create: if isHRorAdmin() && isActiveAccount();
+
+      // User can update ONLY explicitly allowed non-sensitive fields.
+      // HR/Admin can update any field.
+      allow update: if isAuthenticated() && (
+        // Self-update: only permitted fields, never HR-controlled fields
+        (request.auth.uid == uid && isActiveAccount() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'phone', 'photoUrl', 'skills', 'emergencyContact', 'emergencyPhone', 'careerGoals', 'updatedAt'
+          ])
+        ) ||
+        // HR/Admin: can update any field (but cannot change own role/status)
+        (isHRorAdmin() && isActiveAccount() && (
+          request.auth.uid != uid ||
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status'])
+        ))
+      );
+
+      allow delete: if false; // Soft delete via status='ARCHIVED'
+    }
+
+    // ============================================================
+    // DEPARTMENTS
+    // ============================================================
+    match /departments/{id} {
+      allow read: if isAuthenticated();
+      allow create, update: if isHRorAdmin() && isActiveAccount();
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // HOLIDAYS
+    // ============================================================
+    match /holidays/{id} {
+      allow read: if isAuthenticated();
+      allow create, update: if isHRorAdmin() && isActiveAccount();
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // 2. ATTENDANCE
+    // ============================================================
+    match /attendance/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid ||
+        isHRorAdmin() ||
+        isManagerOf(resource.data.employeeId)
+      );
+
+      // User can create ONLY their own attendance
+      allow create: if isAuthenticated() && isActiveAccount() &&
+        request.resource.data.employeeId == request.auth.uid;
+
+      // User can update ONLY check-in/check-out fields on own record.
+      // employeeId must NEVER change.
+      // HR/Admin can correct any field.
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        (resource.data.employeeId == request.auth.uid &&
+          resource.data.employeeId == request.resource.data.employeeId && // employeeId must not change
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'checkIn', 'checkOut', 'workHours', 'breakMinutes', 'updatedAt'
+          ])
+        ) ||
+        (isHRorAdmin() && resource.data.employeeId == request.resource.data.employeeId)
+      );
+
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // LEAVE BALANCES
+    // ============================================================
+    match /leaveBalances/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || isHRorAdmin()
+      );
+      // Only HR/Admin can create or modify balances
+      allow create, update: if isHRorAdmin() && isActiveAccount();
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // 3. LEAVE REQUESTS
+    // ============================================================
+    match /leaveRequests/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid ||
+        isHRorAdmin() ||
+        isManagerOf(resource.data.employeeId) ||
+        resource.data.approverId == request.auth.uid
+      );
+
+      // User can create ONLY their own leave request with employee-controlled fields only
+      allow create: if isAuthenticated() && isActiveAccount() &&
+        request.resource.data.employeeId == request.auth.uid &&
+        request.resource.data.status == 'PENDING' &&
+        request.resource.data.approverId == null;
+
+      // Employee can cancel own (only status → CANCELLED).
+      // Approver/Manager/HR can approve/reject (only approval fields).
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        // Employee: can only change reason/dates or cancel (never approval fields)
+        (resource.data.employeeId == request.auth.uid &&
+          resource.data.employeeId == request.resource.data.employeeId && // employeeId must not change
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'reason', 'fromDate', 'toDate', 'days', 'status', 'updatedAt'
+          ]) &&
+          // If employee changes status, it must be to CANCELLED only
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+           request.resource.data.status == 'CANCELLED') &&
+          // Employee must not touch approval fields
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'approverId', 'approverNote', 'decidedAt'
+          ])
+        ) ||
+        // Approver: can only change approval fields, and status must be APPROVED/REJECTED
+        (resource.data.approverId == request.auth.uid &&
+          resource.data.employeeId == request.resource.data.employeeId && // employeeId must not change
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'approverId', 'approverNote', 'decidedAt', 'updatedAt'
+          ]) &&
+          request.resource.data.status in ['APPROVED', 'REJECTED']
+        ) ||
+        // HR/Admin: can change any approval field
+        (isHRorAdmin() && resource.data.employeeId == request.resource.data.employeeId)
+      );
+
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // PROJECTS
+    // ============================================================
+    match /projects/{id} {
+      allow read: if isAuthenticated();
+      allow create: if isManager() && isActiveAccount();
+      allow update: if isManager() && isActiveAccount();
+      allow delete: if false;
+    }
+
+    match /projectMembers/{id} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isManager() && isActiveAccount();
+    }
+
+    // ============================================================
+    // 4. TASKS
+    // ============================================================
+    match /tasks/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.assignedTo == request.auth.uid ||
+        resource.data.createdBy == request.auth.uid ||
+        isHRorAdmin() ||
+        (resource.data.assignedTo != null && isManagerOf(resource.data.assignedTo))
+      );
+
+      // Only Manager/Admin/HR can create tasks
+      allow create: if hasRole(['MANAGER', 'ADMIN', 'HR']) && isActiveAccount();
+
+      // Assignee: can update ONLY submission/status fields.
+      // Manager/Admin/HR/Creator: can update management/review fields.
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        // Assignee: only permitted fields, never manager-controlled
+        (resource.data.assignedTo == request.auth.uid &&
+          resource.data.assignedTo == request.resource.data.assignedTo && // assignedTo must not change
+          resource.data.createdBy == request.resource.data.createdBy && // createdBy must not change
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'submissionNote', 'submittedAt', 'updatedAt'
+          ]) &&
+          // Assignee can only set status to IN_PROGRESS or SUBMITTED
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+           request.resource.data.status in ['IN_PROGRESS', 'SUBMITTED']) &&
+          // Must not touch manager-controlled fields
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'assignedTo', 'createdBy', 'deadline', 'priority', 'managerScore',
+            'managerFeedback', 'aiScore', 'aiFeedback', 'completedAt',
+            'expectedDeliverable', 'evaluationCriteria', 'rubric', 'requirements'
+          ])
+        ) ||
+        // Creator/Manager/Admin/HR: can update management/review fields
+        (resource.data.createdBy == request.auth.uid || isManager())
+      );
+
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // 5. TASK SUBMISSIONS
+    // ============================================================
+    match /taskSubmissions/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid ||
+        isManager() || isHRorAdmin()
+      );
+
+      // Submission owner can create their own submission
+      allow create: if isAuthenticated() && isActiveAccount() &&
+        request.resource.data.employeeId == request.auth.uid;
+
+      // Submission owner: can update ONLY submission content fields (draft, resubmit).
+      // Reviewer/Manager/HR/Admin: can update review fields only.
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        // Submission owner: can only change content fields, NEVER review fields
+        (resource.data.employeeId == request.auth.uid &&
+          resource.data.employeeId == request.resource.data.employeeId && // employeeId must not change
+          resource.data.taskId == request.resource.data.taskId && // taskId must not change
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'submissionNote', 'files', 'links', 'status', 'submittedAt', 'updatedAt'
+          ]) &&
+          // Owner can only set status to DRAFT or SUBMITTED
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+           request.resource.data.status in ['DRAFT', 'SUBMITTED']) &&
+          // Must NOT touch any review fields
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'managerScore', 'managerFeedback', 'aiScore', 'aiFeedback',
+            'reviewerId', 'reviewScheduledAt', 'reviewedAt'
+          ])
+        ) ||
+        // Reviewer/Manager/HR/Admin: can update review fields only
+        (isReviewer() &&
+          resource.data.employeeId == request.resource.data.employeeId && // employeeId must not change
+          resource.data.taskId == request.resource.data.taskId && // taskId must not change
+          // Reviewer can only set status to APPROVED, CHANGES_REQUESTED, REJECTED, UNDER_REVIEW
+          (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']) ||
+           request.resource.data.status in ['APPROVED', 'CHANGES_REQUESTED', 'REJECTED', 'UNDER_REVIEW'])
+        )
+      );
+
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // 6. REVIEW REQUESTS
+    // ============================================================
+    match /reviewRequests/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid ||
+        resource.data.reviewerId == request.auth.uid ||
+        isHRorAdmin()
+      );
+
+      // Only system (Admin SDK) can create review requests — prevents spoofing
+      allow create: if false;
+
+      // Only the assigned reviewer or HR/Admin can modify review decisions
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        (resource.data.reviewerId == request.auth.uid || isHRorAdmin()) &&
+        // employeeId and submissionId must not change
+        resource.data.employeeId == request.resource.data.employeeId &&
+        resource.data.submissionId == request.resource.data.submissionId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'scheduledAt', 'duration', 'reviewerId', 'meetingLink',
+          'notes', 'priority', 'updatedAt'
+        ])
+      );
+
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // 7. PERFORMANCE
+    // ============================================================
+    match /performance/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || isManager() || isHRorAdmin()
+      );
+      // Only Manager/HR/Admin can create or modify performance records
+      allow create, update: if isManager() && isActiveAccount();
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // 7. GOALS
+    // ============================================================
+    match /goals/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || isManager() || isHRorAdmin()
+      );
+
+      // Employee or Manager/HR/Admin can create goals for the employee
+      allow create: if isAuthenticated() && isActiveAccount() && (
+        request.resource.data.employeeId == request.auth.uid || isManager()
+      );
+
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        // Employee: can only update progress and description, NOT status
+        (resource.data.employeeId == request.auth.uid &&
+          resource.data.employeeId == request.resource.data.employeeId && // employeeId must not change
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'progress', 'description', 'target', 'updatedAt'
+          ]) &&
+          // Employee cannot change status (manager only)
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+        ) ||
+        // Manager/HR/Admin: can update any field including status
+        (isManager() && resource.data.employeeId == request.resource.data.employeeId)
+      );
+
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // 7. LEARNING
+    // ============================================================
+    match /learning/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || isManager() || isHRorAdmin()
+      );
+      // Only system (Admin SDK) or HR/Admin can create learning assignments
+      allow create: if isHRorAdmin() && isActiveAccount();
+      // Employee can update only progress; Manager/HR can update any field
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        (resource.data.employeeId == request.auth.uid &&
+          resource.data.employeeId == request.resource.data.employeeId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'progress', 'status', 'completedAt', 'updatedAt'
+          ])
+        ) ||
+        isHRorAdmin()
+      );
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // 8. DOCUMENTS
+    // ============================================================
+    match /documents/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid ||
+        isHRorAdmin() ||
+        resource.data.category == 'POLICY'
+      );
+
+      // User can create ONLY documents owned by themselves.
+      // HR/Admin can create documents for anyone OR with employeeId=null (org-wide policy docs).
+      // Non-HR users cannot create employeeId=null documents.
+      allow create: if isAuthenticated() && isActiveAccount() && (
+        (request.resource.data.employeeId == request.auth.uid) ||
+        (isHRorAdmin() && (request.resource.data.employeeId == null || request.resource.data.employeeId is string))
+      );
+
+      // Only HR/Admin can modify documents
+      allow update: if isHRorAdmin() && isActiveAccount();
+      allow delete: if isHRorAdmin() && isActiveAccount();
+    }
+
+    // ============================================================
+    // HR REQUESTS (SERVICE TICKETS)
+    // ============================================================
+    match /hrRequests/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || isHRorAdmin()
+      );
+      // User can create ONLY their own service request
+      allow create: if isAuthenticated() && isActiveAccount() &&
+        request.resource.data.employeeId == request.auth.uid &&
+        request.resource.data.status == 'CREATED';
+      // User can only add description/details; HR/Admin can update status/resolution
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        (resource.data.employeeId == request.auth.uid &&
+          resource.data.employeeId == request.resource.data.employeeId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'description', 'subject', 'priority', 'updatedAt'
+          ])
+        ) ||
+        (isHRorAdmin() && resource.data.employeeId == request.resource.data.employeeId)
+      );
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // ANNOUNCEMENTS
+    // ============================================================
+    match /announcements/{id} {
+      allow read: if isAuthenticated();
+      allow create: if hasRole(['HR', 'ADMIN']) && isActiveAccount();
+      // Only the author or HR/Admin can update
+      allow update: if hasRole(['HR', 'ADMIN']) && isActiveAccount();
+      allow delete: if isHRorAdmin() && isActiveAccount();
+    }
+
+    // ============================================================
+    // NOTIFICATIONS
+    // ============================================================
+    match /notifications/{id} {
+      allow read: if isAuthenticated() && resource.data.employeeId == request.auth.uid;
+      // Only system (Admin SDK) can create notifications — prevents spoofing
+      allow create: if false;
+      // User can ONLY mark their own as read (only the 'read' field)
+      allow update: if isAuthenticated() && isActiveAccount() &&
+        resource.data.employeeId == request.auth.uid &&
+        resource.data.employeeId == request.resource.data.employeeId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // ASSETS
+    // ============================================================
+    match /assets/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || isHRorAdmin()
+      );
+      allow create, update: if isHRorAdmin() && isActiveAccount();
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // EXPENSES
+    // ============================================================
+    match /expenses/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || isManager() || isHRorAdmin()
+      );
+      // User can create ONLY their own expense with PENDING status
+      allow create: if isAuthenticated() && isActiveAccount() &&
+        request.resource.data.employeeId == request.auth.uid &&
+        request.resource.data.status == 'PENDING';
+      // Employee can only update description/category/amount before approval.
+      // Manager/HR can only update status.
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        (resource.data.employeeId == request.auth.uid &&
+          resource.data.employeeId == request.resource.data.employeeId &&
+          resource.data.status == 'PENDING' && // Can only edit while pending
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'amount', 'category', 'description', 'date', 'updatedAt'
+          ]) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+        ) ||
+        (isManager() && resource.data.employeeId == request.resource.data.employeeId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'updatedAt'
+          ])
+        )
+      );
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // AUDIT LOGS
+    // ============================================================
+    match /auditLogs/{id} {
+      allow read: if isHRorAdmin();
+      // Append-only via Admin SDK — no client writes
+      allow create: if false;
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // ONBOARDING TASKS
+    // ============================================================
+    match /onboardingTasks/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || isHRorAdmin()
+      );
+      // Only HR/Admin can create onboarding tasks
+      allow create: if isHRorAdmin() && isActiveAccount();
+      // Employee can only toggle completed/completedAt.
+      // HR/Admin can modify any field.
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        (resource.data.employeeId == request.auth.uid &&
+          resource.data.employeeId == request.resource.data.employeeId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'completed', 'completedAt', 'updatedAt'
+          ])
+        ) ||
+        (isHRorAdmin() && resource.data.employeeId == request.resource.data.employeeId)
+      );
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // TRAVEL REQUESTS
+    // ============================================================
+    match /travelRequests/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.employeeId == request.auth.uid || isManager() || isHRorAdmin()
+      );
+      // User can create ONLY their own travel request
+      allow create: if isAuthenticated() && isActiveAccount() &&
+        request.resource.data.employeeId == request.auth.uid &&
+        request.resource.data.status == 'PENDING';
+      // Employee can update only content fields while PENDING.
+      // Manager/HR can update only status/approval fields.
+      allow update: if isAuthenticated() && isActiveAccount() && (
+        (resource.data.employeeId == request.auth.uid &&
+          resource.data.employeeId == request.resource.data.employeeId &&
+          resource.data.status == 'PENDING' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'destination', 'purpose', 'startDate', 'endDate', 'transport',
+            'accommodation', 'advanceAmount', 'description', 'type', 'updatedAt'
+          ]) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+        ) ||
+        (isManager() && resource.data.employeeId == request.resource.data.employeeId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'approverId', 'approverNote', 'decidedAt', 'updatedAt'
+          ])
+        )
+      );
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // OFFBOARDING
+    // ============================================================
+    match /offboarding/{id} {
+      allow read: if isHRorAdmin();
+      allow create, update: if isHRorAdmin() && isActiveAccount();
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // 9. MEETINGS
+    // ============================================================
+    match /meetings/{id} {
+      allow read: if isAuthenticated() && (
+        resource.data.organizerId == request.auth.uid ||
+        (resource.data.attendeeIds is list && request.auth.uid in resource.data.attendeeIds) ||
+        isHRorAdmin()
+      );
+      // User can create meetings but organizerId MUST equal their own UID
+      allow create: if isAuthenticated() && isActiveAccount() &&
+        request.resource.data.organizerId == request.auth.uid;
+      // Only the organizer can update their meeting
+      allow update: if isAuthenticated() && isActiveAccount() &&
+        resource.data.organizerId == request.auth.uid &&
+        resource.data.organizerId == request.resource.data.organizerId; // organizerId must not change
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // BATCHES
+    // ============================================================
+    match /batches/{id} {
+      allow read: if isHRorAdmin() || isManager();
+      allow create, update: if isHRorAdmin() && isActiveAccount();
+      allow delete: if false;
+    }
+
+    // ============================================================
+    // CATCH-ALL: Deny everything else
+    // ============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

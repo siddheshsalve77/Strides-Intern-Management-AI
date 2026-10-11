@@ -1,0 +1,434 @@
+// STRIDES ONE - Enterprise Employee Experience Portal
+// Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Employee {
+  id              String   @id @default(cuid())
+  employeeId      String   @unique
+  email           String   @unique
+  name            String
+  password        String   @default("password123")
+  role            String   @default("EMPLOYEE") // EMPLOYEE | INTERN | MANAGER | HR | ADMIN
+  designation     String   @default("")
+  department      String   @default("Engineering")
+  team            String   @default("")
+  managerId      String?
+  manager         Employee? @relation("ManagerRelation", fields: [managerId], references: [id])
+  reports         Employee[] @relation("ManagerRelation")
+  employmentType  String   @default("Full-time") // Full-time | Intern | Contract
+  workLocation    String   @default("Aurangabad")
+  joinDate        DateTime @default(now())
+  internshipStart DateTime? // for interns
+  internshipEnd   DateTime? // for interns
+  batchId         String?  // for interns — references InternBatch
+  status          String   @default("ACTIVE") // ACTIVE | SUSPENDED | INACTIVE | ARCHIVED | ON_LEAVE
+  phone           String   @default("")
+  photoUrl        String   @default("")
+  skills          String   @default("")
+  emergencyContact String  @default("")
+  emergencyPhone  String   @default("")
+  careerGoals     String   @default("")
+  // Relations
+  attendance      Attendance[]
+  leaveRequests   LeaveRequest[]
+  leaveBalances   LeaveBalance[]
+  tasksAssigned   Task[]    @relation("TaskAssignee")
+  tasksCreated    Task[]    @relation("TaskCreator")
+  projects        ProjectMember[]
+  performance     Performance[]
+  goals           Goal[]
+  learning        Learning[]
+  documents       Document[]
+  hrRequests      HRRequest[]
+  expenses        Expense[]
+  assets          Asset[]
+  onboardingTasks OnboardingTask[]
+  travelRequests TravelRequest[]
+  offboarding    Offboarding[]
+  meetings       Meeting[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  head        String   @default("")
+  description String   @default("")
+  createdAt   DateTime @default(now())
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  name        String
+  date        DateTime
+  type        String   @default("PUBLIC") // PUBLIC | COMPANY | OPTIONAL
+  description String   @default("")
+  createdAt   DateTime @default(now())
+}
+
+model Attendance {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  date        DateTime
+  checkIn     DateTime?
+  checkOut    DateTime?
+  status      String   @default("PRESENT") // PRESENT | LATE | HALF_DAY | ABSENT | LEAVE | HOLIDAY | WFH | WEEKEND
+  workHours   Float    @default(0)
+  breakMinutes Int    @default(0)
+  note        String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LeaveBalance {
+  id           String  @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  casualLeave  Float   @default(12)
+  sickLeave    Float   @default(12)
+  earnedLeave  Float   @default(15)
+  year         Int     @default(2026)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model LeaveRequest {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  leaveType   String   @default("CASUAL") // CASUAL | SICK | EARNED | UNPAID
+  fromDate    DateTime
+  toDate      DateTime
+  days        Float    @default(1)
+  reason      String   @default("")
+  status      String   @default("PENDING") // PENDING | APPROVED | REJECTED | CANCELLED
+  approverId  String?
+  approverNote String  @default("")
+  appliedAt   DateTime @default(now())
+  decidedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  managerId   String   @default("")
+  status      String   @default("ACTIVE") // ACTIVE | ON_HOLD | COMPLETED | CANCELLED
+  priority     String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  startDate   DateTime @default(now())
+  endDate     DateTime?
+  progress    Float    @default(0)
+  members     ProjectMember[]
+  tasks       Task[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ProjectMember {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  role        String   @default("MEMBER") // LEAD | MEMBER | CONTRIBUTOR
+  createdAt   DateTime @default(now())
+}
+
+model Task {
+  id           String   @id @default(cuid())
+  title        String
+  description  String   @default("")
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id])
+  assigneeId   String?
+  assignee     Employee? @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creatorId    String
+  creator      Employee @relation("TaskCreator", fields: [creatorId], references: [id])
+  status       String   @default("CREATED") // CREATED | ASSIGNED | ACCEPTED | IN_PROGRESS | SUBMITTED | UNDER_REVIEW | APPROVED | COMPLETED
+  priority     String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  startDate    DateTime @default(now())
+  deadline     DateTime?
+  submittedAt  DateTime?
+  completedAt  DateTime?
+  expectedDeliverable String @default("")
+  evaluationCriteria String @default("")
+  aiScore      Float?
+  aiFeedback   String   @default("")
+  managerScore Float?
+  managerFeedback String @default("")
+  submissionNote String @default("")
+  // Rubric: JSON-encoded array of {criteria, maxScore}
+  rubric        String   @default("")
+  // Requirements checklist: JSON-encoded array of {item, required}
+  requirements  String   @default("")
+  submissions   TaskSubmission[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Performance {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  period      String   @default("Q3-2026")
+  overall     Float    @default(0)
+  goalAchievement Float @default(0)
+  taskCompletion Float  @default(0)
+  quality     Float    @default(0)
+  attendance  Float    @default(0)
+  managerRating Float  @default(0)
+  summary     String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Goal {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  title       String
+  description String   @default("")
+  target      String   @default("")
+  deadline    DateTime?
+  progress    Float    @default(0)
+  status      String   @default("ACTIVE") // ACTIVE | COMPLETED | ON_HOLD | CANCELLED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Learning {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  courseName  String
+  category    String   @default("TECHNICAL")
+  progress    Float    @default(0)
+  status      String   @default("IN_PROGRESS") // NOT_STARTED | IN_PROGRESS | COMPLETED
+  completedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  employeeId  String?
+  employee    Employee? @relation(fields: [employeeId], references: [id])
+  title       String
+  category    String   @default("HR") // HR | OFFER | POLICY | CERTIFICATE | TRAINING | PERFORMANCE
+  fileName    String   @default("")
+  fileUrl     String   @default("")
+  uploadedAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+}
+
+model HRRequest {
+  id          String   @id @default(cuid())
+  ticketId    String   @unique
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  category    String   @default("HR") // HR | IT | ADMIN | FINANCE | FACILITIES | ACCESS | DOCUMENT | OTHER
+  subject     String
+  description String   @default("")
+  priority    String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  status      String   @default("CREATED") // CREATED | ASSIGNED | IN_PROGRESS | RESOLVED | CLOSED
+  assignedTo  String   @default("")
+  resolution  String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  category    String   @default("GENERAL") // GENERAL | POLICY | EVENT | HOLIDAY | TRAINING | NOTICE
+  priority    String   @default("MEDIUM")
+  authorId    String   @default("")
+  authorName  String   @default("")
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  title       String
+  message     String
+  type        String   @default("INFO") // INFO | TASK | LEAVE | REQUEST | ANNOUNCEMENT | PERFORMANCE | DEADLINE
+  read        Boolean  @default(false)
+  link        String   @default("")
+  createdAt   DateTime @default(now())
+}
+
+model Asset {
+  id          String   @id @default(cuid())
+  employeeId  String?
+  employee    Employee? @relation(fields: [employeeId], references: [id])
+  assetId     String   @unique
+  name        String
+  model       String   @default("")
+  category    String   @default("IT") // IT | FURNITURE | OTHER
+  issuedAt    DateTime @default(now())
+  status      String   @default("ACTIVE") // ACTIVE | RETURNED | RETIRED
+  createdAt   DateTime @default(now())
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id])
+  category    String   @default("TRAVEL") // TRAVEL | FOOD | CLIENT | TRANSPORT | OTHER
+  amount      Float
+  currency    String   @default("INR")
+  date        DateTime @default(now())
+  description String   @default("")
+  status      String   @default("PENDING") // PENDING | MANAGER_APPROVED | FINANCE_APPROVED | PROCESSED | REJECTED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  employeeId  String?
+  employee    Employee? @relation(fields: [employeeId], references: [id])
+  actorName   String   @default("")
+  action      String
+  entity      String   @default("")
+  entityId    String   @default("")
+  details     String   @default("")
+  createdAt   DateTime @default(now())
+}
+
+model OnboardingTask {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  title       String
+  category    String   @default("GENERAL") // DOCUMENTS | IT | HR | TRAINING | INTRO | GENERAL
+  description String   @default("")
+  order       Int      @default(0)
+  completed   Boolean  @default(false)
+  completedAt DateTime?
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TravelRequest {
+  id           String   @id @default(cuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type         String   @default("BUSINESS") // BUSINESS | CLIENT_VISIT | TRAINING | CONFERENCE
+  destination  String
+  purpose      String
+  startDate    DateTime
+  endDate      DateTime
+  transport    String   @default("FLIGHT") // FLIGHT | TRAIN | CAR | BUS
+  accommodation Boolean  @default(false)
+  advanceAmount Float   @default(0)
+  status       String   @default("PENDING") // PENDING | MANAGER_APPROVED | HR_APPROVED | BOOKED | REJECTED | COMPLETED
+  approverId   String?
+  approverNote String   @default("")
+  appliedAt    DateTime @default(now())
+  decidedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Offboarding {
+  id           String   @id @default(cuid())
+  employeeId   String   @unique
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type         String   @default("RESIGNATION") // RESIGNATION | CONTRACT_END | TERMINATION
+  reason       String   @default("")
+  requestedDate DateTime @default(now())
+  lastWorkingDay DateTime?
+  status       String   @default("INITIATED") // INITIATED | MANAGER_APPROVED | HR_PROCESSING | ASSET_RETURN | ACCESS_REVOKED | EXIT_DOCUMENTATION | COMPLETED | CANCELLED
+  approverId   String?
+  exitNotes    String   @default("")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Meeting {
+  id          String   @id @default(cuid())
+  title       String
+  description String   @default("")
+  organizerId String
+  organizer   Employee @relation(fields: [organizerId], references: [id])
+  attendeeIds String   @default("") // comma-separated employee IDs (SQLite has no array)
+  startTime   DateTime
+  endTime     DateTime
+  location    String   @default("Online")
+  type        String   @default("MEETING") // MEETING | STANDUP | REVIEW | TRAINING | INTERVIEW | OTHER
+  status      String   @default("SCHEDULED") // SCHEDULED | IN_PROGRESS | COMPLETED | CANCELLED
+  createdAt   DateTime @default(now())
+}
+
+model TaskSubmission {
+  id            String   @id @default(cuid())
+  taskId        String
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employeeId    String
+  version       Int      @default(1)
+  submissionNote String @default("")
+  files         String   @default("") // comma-separated file names
+  links         String   @default("") // comma-separated URLs
+  status        String   @default("SUBMITTED") // DRAFT | SUBMITTED | UNDER_REVIEW | APPROVED | CHANGES_REQUESTED | REJECTED
+  aiScore       Float?
+  aiFeedback    String   @default("")
+  managerScore  Float?
+  managerFeedback String @default("")
+  reviewerId    String?
+  reviewScheduledAt DateTime?
+  reviewedAt    DateTime?
+  submittedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ReviewRequest {
+  id            String   @id @default(cuid())
+  submissionId  String
+  taskId        String
+  employeeId    String
+  reviewerId    String?
+  status        String   @default("PENDING") // PENDING | SCHEDULED | COMPLETED | CANCELLED
+  priority      String   @default("NORMAL") // URGENT | HIGH | NORMAL | LOW
+  scheduledAt   DateTime?
+  duration      Int      @default(20) // minutes
+  meetingLink   String   @default("")
+  notes         String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model InternBatch {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  program       String   @default("Software Internship")
+  department    String   @default("Engineering")
+  startDate     DateTime
+  endDate       DateTime
+  capacity      Int      @default(20)
+  managerId     String?
+  mentorIds     String   @default("")
+  status        String   @default("ACTIVE") // ACTIVE | COMPLETED | ARCHIVED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}

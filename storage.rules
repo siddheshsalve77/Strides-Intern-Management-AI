@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // All file access is handled server-side via Supabase Storage
+    // Firebase Storage rules are a fallback — deny by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

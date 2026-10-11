@@ -1,0 +1,1133 @@
+     1→@import "tailwindcss";
+     2→@import "tw-animate-css";
+     3→
+     4→@custom-variant dark (&:is(.dark *));
+     5→
+     6→@theme inline {
+     7→  --color-background: var(--background);
+     8→  --color-foreground: var(--foreground);
+     9→  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    10→  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", monospace;
+    11→  --color-sidebar-ring: var(--sidebar-ring);
+    12→  --color-sidebar-border: var(--sidebar-border);
+    13→  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    14→  --color-sidebar-accent: var(--sidebar-accent);
+    15→  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    16→  --color-sidebar-primary: var(--sidebar-primary);
+    17→  --color-sidebar-foreground: var(--sidebar-foreground);
+    18→  --color-sidebar: var(--sidebar);
+    19→  --color-chart-5: var(--chart-5);
+    20→  --color-chart-4: var(--chart-4);
+    21→  --color-chart-3: var(--chart-3);
+    22→  --color-chart-2: var(--chart-2);
+    23→  --color-chart-1: var(--chart-1);
+    24→  --color-ring: var(--ring);
+    25→  --color-input: var(--input);
+    26→  --color-border: var(--border);
+    27→  --color-destructive: var(--destructive);
+    28→  --color-accent-foreground: var(--accent-foreground);
+    29→  --color-accent: var(--accent);
+    30→  --color-muted-foreground: var(--muted-foreground);
+    31→  --color-muted: var(--muted);
+    32→  --color-secondary-foreground: var(--secondary-foreground);
+    33→  --color-secondary: var(--secondary);
+    34→  --color-primary-foreground: var(--primary-foreground);
+    35→  --color-primary: var(--primary);
+    36→  --color-popover-foreground: var(--popover-foreground);
+    37→  --color-popover: var(--popover);
+    38→  --color-card-foreground: var(--card-foreground);
+    39→  --color-card: var(--card);
+    40→  --color-success: var(--success);
+    41→  --color-warning: var(--warning);
+    42→  --color-info: var(--info);
+    43→  --radius-sm: calc(var(--radius) - 4px);
+    44→  --radius-md: calc(var(--radius) - 2px);
+    45→  --radius-lg: var(--radius);
+    46→  --radius-xl: calc(var(--radius) + 4px);
+    47→}
+    48→
+    49→:root {
+    50→  --radius: 0.625rem;
+    51→
+    52→  /* ── STRIDES ONE — Refined Enterprise OS Theme ───────────────
+    53→     Calm, sophisticated, information-dense.
+    54→     Primary: deep emerald-teal. Surfaces: warm paper. Nav: deep slate. */
+    55→
+    56→  /* Primary — sophisticated emerald-teal */
+    57→  --primary: oklch(0.45 0.09 178);
+    58→  --primary-foreground: oklch(0.99 0.005 178);
+    59→
+    60→  /* Warm paper surfaces — never pure white */
+    61→  --background: oklch(0.984 0.004 75);
+    62→  --foreground: oklch(0.21 0.015 75);
+    63→  --card: oklch(1 0 0);
+    64→  --card-foreground: oklch(0.21 0.015 75);
+    65→  --popover: oklch(1 0 0);
+    66→  --popover-foreground: oklch(0.21 0.015 75);
+    67→
+    68→  /* Secondary / muted — warm neutrals */
+    69→  --secondary: oklch(0.965 0.005 75);
+    70→  --secondary-foreground: oklch(0.25 0.015 75);
+    71→  --muted: oklch(0.967 0.004 75);
+    72→  --muted-foreground: oklch(0.49 0.012 75);
+    73→  --accent: oklch(0.95 0.018 178);
+    74→  --accent-foreground: oklch(0.3 0.05 178);
+    75→
+    76→  /* Semantic accents — restrained */
+    77→  --destructive: oklch(0.56 0.2 25);
+    78→  --success: oklch(0.6 0.12 155);
+    79→  --warning: oklch(0.7 0.13 70);
+    80→  --info: oklch(0.55 0.11 240);
+    81→
+    82→  /* Borders & inputs — hairline, warm */
+    83→  --border: oklch(0.908 0.004 75);
+    84→  --input: oklch(0.908 0.004 75);
+    85→  --ring: oklch(0.45 0.09 178);
+    86→
+    87→  /* Chart palette — teal/emerald/blue/amber/coral */
+    88→  --chart-1: oklch(0.5 0.09 178);
+    89→  --chart-2: oklch(0.6 0.13 155);
+    90→  --chart-3: oklch(0.55 0.12 240);
+    91→  --chart-4: oklch(0.7 0.13 70);
+    92→  --chart-5: oklch(0.6 0.17 20);
+    93→
+    94→  /* Deep slate navigation — confident, structured */
+    95→  --sidebar: oklch(0.19 0.013 260);
+    96→  --sidebar-foreground: oklch(0.9 0.006 260);
+    97→  --sidebar-primary: oklch(0.62 0.1 178);
+    98→  --sidebar-primary-foreground: oklch(0.99 0.005 178);
+    99→  --sidebar-accent: oklch(0.245 0.012 260);
+   100→  --sidebar-accent-foreground: oklch(0.96 0.005 260);
+   101→  --sidebar-border: oklch(0.27 0.012 260);
+   102→  --sidebar-ring: oklch(0.62 0.1 178);
+   103→
+   104→  /* ── PREMIUM MULTI-ACCENT SYSTEM ───────────────────────────
+   105→     Sophisticated multi-accent palette for richer communication.
+   106→     Teal→emerald primary, electric blue / violet / indigo for AI,
+   107→     amber / coral / rose for warmth & attention. */
+   108→  --accent-violet: oklch(0.58 0.17 290);
+   109→  --accent-indigo: oklch(0.5 0.15 265);
+   110→  --accent-electric: oklch(0.6 0.17 235);
+   111→  --accent-coral: oklch(0.65 0.16 25);
+   112→  --accent-rose: oklch(0.62 0.18 15);
+   113→  --accent-amber: oklch(0.7 0.14 65);
+   114→  --accent-teal: oklch(0.55 0.1 185);
+   115→  --accent-emerald: oklch(0.6 0.12 155);
+   116→
+   117→  /* Subtle accent-tinted backgrounds (for soft chips, hovers) */
+   118→  --accent-violet-soft: oklch(0.58 0.17 290 / 0.1);
+   119→  --accent-indigo-soft: oklch(0.5 0.15 265 / 0.1);
+   120→  --accent-electric-soft: oklch(0.6 0.17 235 / 0.1);
+   121→  --accent-coral-soft: oklch(0.65 0.16 25 / 0.1);
+   122→  --accent-rose-soft: oklch(0.62 0.18 15 / 0.1);
+   123→  --accent-amber-soft: oklch(0.7 0.14 65 / 0.12);
+   124→
+   125→  /* ── GRADIENT TOKENS ──────────────────────────────────────
+   126→     Used on hero surfaces, selected states, AI areas, premium
+   127→     buttons, progress. NOT applied blanket — only where color
+   128→     communicates meaning. */
+   129→  --gradient-primary: linear-gradient(135deg, oklch(0.48 0.1 178), oklch(0.52 0.13 165));
+   130→  --gradient-primary-soft: linear-gradient(135deg, oklch(0.48 0.1 178 / 0.12), oklch(0.52 0.13 165 / 0.12));
+   131→  --gradient-ai: linear-gradient(135deg, oklch(0.52 0.16 235), oklch(0.56 0.17 290));
+   132→  --gradient-ai-soft: linear-gradient(135deg, oklch(0.52 0.16 235 / 0.14), oklch(0.56 0.17 290 / 0.14));
+   133→  --gradient-success: linear-gradient(135deg, oklch(0.55 0.12 155), oklch(0.62 0.13 168));
+   134→  --gradient-warm: linear-gradient(135deg, oklch(0.72 0.14 65), oklch(0.62 0.16 25));
+   135→  --gradient-violet: linear-gradient(135deg, oklch(0.56 0.16 290), oklch(0.5 0.15 265));
+   136→  --gradient-cool: linear-gradient(135deg, oklch(0.55 0.1 185), oklch(0.52 0.16 235));
+   137→  --gradient-sunset: linear-gradient(135deg, oklch(0.65 0.16 25), oklch(0.62 0.18 15));
+   138→
+   139→  /* Soft glow color stops (for ambient background blobs) */
+   140→  --glow-teal: oklch(0.55 0.1 185 / 0.5);
+   141→  --glow-violet: oklch(0.58 0.17 290 / 0.45);
+   142→  --glow-blue: oklch(0.6 0.17 235 / 0.4);
+   143→  --glow-amber: oklch(0.72 0.14 65 / 0.35);
+   144→  --glow-rose: oklch(0.62 0.18 15 / 0.35);
+   145→}
+   146→
+   147→.dark {
+   148→  --primary: oklch(0.64 0.1 178);
+   149→  --primary-foreground: oklch(0.16 0.015 260);
+   150→  --background: oklch(0.145 0.012 260);
+   151→  --foreground: oklch(0.97 0.005 260);
+   152→  --card: oklch(0.185 0.012 260);
+   153→  --card-foreground: oklch(0.97 0.005 260);
+   154→  --popover: oklch(0.185 0.012 260);
+   155→  --popover-foreground: oklch(0.97 0.005 260);
+   156→  --secondary: oklch(0.245 0.012 260);
+   157→  --secondary-foreground: oklch(0.97 0.005 260);
+   158→  --muted: oklch(0.225 0.012 260);
+   159→  --muted-foreground: oklch(0.68 0.015 260);
+   160→  --accent: oklch(0.28 0.03 178);
+   161→  --accent-foreground: oklch(0.92 0.015 178);
+   162→  --destructive: oklch(0.68 0.19 22);
+   163→  --success: oklch(0.66 0.12 155);
+   164→  --warning: oklch(0.74 0.13 70);
+   165→  --info: oklch(0.64 0.1 240);
+   166→  --border: oklch(1 0 0 / 8%);
+   167→  --input: oklch(1 0 0 / 12%);
+   168→  --ring: oklch(0.64 0.1 178);
+   169→  --chart-1: oklch(0.64 0.1 178);
+   170→  --chart-2: oklch(0.68 0.13 155);
+   171→  --chart-3: oklch(0.64 0.1 240);
+   172→  --chart-4: oklch(0.74 0.13 70);
+   173→  --chart-5: oklch(0.66 0.17 20);
+   174→  --sidebar: oklch(0.12 0.012 260);
+   175→  --sidebar-foreground: oklch(0.9 0.006 260);
+   176→  --sidebar-primary: oklch(0.64 0.1 178);
+   177→  --sidebar-primary-foreground: oklch(0.16 0.015 260);
+   178→  --sidebar-accent: oklch(0.225 0.012 260);
+   179→  --sidebar-accent-foreground: oklch(0.96 0.005 260);
+   180→  --sidebar-border: oklch(0.225 0.012 260);
+   181→  --sidebar-ring: oklch(0.64 0.1 178);
+   182→
+   183→  /* Dark mode premium accents — slightly brighter for contrast */
+   184→  --accent-violet: oklch(0.68 0.17 290);
+   185→  --accent-indigo: oklch(0.62 0.15 265);
+   186→  --accent-electric: oklch(0.68 0.17 235);
+   187→  --accent-coral: oklch(0.7 0.16 25);
+   188→  --accent-rose: oklch(0.68 0.18 15);
+   189→  --accent-amber: oklch(0.75 0.14 65);
+   190→  --accent-teal: oklch(0.64 0.1 185);
+   191→  --accent-emerald: oklch(0.66 0.12 155);
+   192→  --accent-violet-soft: oklch(0.68 0.17 290 / 0.16);
+   193→  --accent-indigo-soft: oklch(0.62 0.15 265 / 0.16);
+   194→  --accent-electric-soft: oklch(0.68 0.17 235 / 0.16);
+   195→  --accent-coral-soft: oklch(0.7 0.16 25 / 0.18);
+   196→  --accent-rose-soft: oklch(0.68 0.18 15 / 0.18);
+   197→  --accent-amber-soft: oklch(0.75 0.14 65 / 0.18);
+   198→  --gradient-primary: linear-gradient(135deg, oklch(0.64 0.1 178), oklch(0.66 0.13 165));
+   199→  --gradient-ai: linear-gradient(135deg, oklch(0.64 0.16 235), oklch(0.66 0.17 290));
+   200→  --glow-teal: oklch(0.64 0.1 185 / 0.4);
+   201→  --glow-violet: oklch(0.68 0.17 290 / 0.4);
+   202→  --glow-blue: oklch(0.68 0.17 235 / 0.35);
+   203→}
+   204→
+   205→@layer base {
+   206→  * {
+   207→    @apply border-border outline-ring/50;
+   208→  }
+   209→  body {
+   210→    @apply bg-background text-foreground;
+   211→    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1, "tnum" 1;
+   212→    -webkit-font-smoothing: antialiased;
+   213→    -moz-osx-font-smoothing: grayscale;
+   214→    text-rendering: optimizeLegibility;
+   215→  }
+   216→  h1, h2, h3, h4, h5, h6 {
+   217→    letter-spacing: -0.017em;
+   218→  }
+   219→  /* Tabular numbers for metric values — enterprise feel */
+   220→  .tabular-nums { font-variant-numeric: tabular-nums; }
+   221→}
+   222→
+   223→/* ============================================================
+   224→   PREMIUM UTILITIES — Enterprise OS Design System
+   225→   ============================================================ */
+   226→@layer utilities {
+   227→  /* ── Scrollbars ─────────────────────────────────────────── */
+   228→  .scrollbar-thin::-webkit-scrollbar {
+   229→    width: 7px;
+   230→    height: 7px;
+   231→  }
+   232→  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+   233→  .scrollbar-thin::-webkit-scrollbar-thumb {
+   234→    background: oklch(0.84 0.004 75);
+   235→    border-radius: 999px;
+   236→    border: 2px solid transparent;
+   237→    background-clip: padding-box;
+   238→  }
+   239→  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+   240→    background: oklch(0.34 0.012 260);
+   241→    background-clip: padding-box;
+   242→  }
+   243→  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+   244→    background: oklch(0.72 0.008 75);
+   245→    background-clip: padding-box;
+   246→  }
+   247→
+   248→  /* ── Background textures ────────────────────────────────── */
+   249→  .bg-grid {
+   250→    background-image:
+   251→      linear-gradient(to right, oklch(0.9 0.003 75) 1px, transparent 1px),
+   252→      linear-gradient(to bottom, oklch(0.9 0.003 75) 1px, transparent 1px);
+   253→    background-size: 28px 28px;
+   254→  }
+   255→  .dark .bg-grid {
+   256→    background-image:
+   257→      linear-gradient(to right, oklch(0.22 0.012 260 / 0.4) 1px, transparent 1px),
+   258→      linear-gradient(to bottom, oklch(0.22 0.012 260 / 0.4) 1px, transparent 1px);
+   259→  }
+   260→  .bg-dots {
+   261→    background-image: radial-gradient(circle, oklch(0.85 0.004 75) 1px, transparent 1px);
+   262→    background-size: 18px 18px;
+   263→  }
+   264→  .dark .bg-dots {
+   265→    background-image: radial-gradient(circle, oklch(0.28 0.012 260 / 0.5) 1px, transparent 1px);
+   266→  }
+   267→  /* Fine cross-hatch for premium feature surfaces */
+   268→  .bg-hatch {
+   269→    background-image:
+   270→      linear-gradient(135deg, oklch(0.9 0.003 75 / 0.6) 25%, transparent 25%),
+   271→      linear-gradient(225deg, oklch(0.9 0.003 75 / 0.6) 25%, transparent 25%);
+   272→    background-size: 8px 8px;
+   273→  }
+   274→
+   275→  .text-balance { text-wrap: balance; }
+   276→  .text-pretty { text-wrap: pretty; }
+   277→
+   278→  /* ── Shadows — layered, soft, enterprise ────────────────── */
+   279→  .shadow-card {
+   280→    box-shadow:
+   281→      0 1px 2px oklch(0.5 0.008 75 / 0.045),
+   282→      0 1px 3px oklch(0.5 0.008 75 / 0.03);
+   283→  }
+   284→  .shadow-card-lg {
+   285→    box-shadow:
+   286→      0 4px 8px oklch(0.5 0.008 75 / 0.05),
+   287→      0 2px 4px oklch(0.5 0.008 75 / 0.03),
+   288→      0 0 0 1px oklch(0.88 0.004 75 / 0.5);
+   289→  }
+   290→  .shadow-pop {
+   291→    box-shadow:
+   292→      0 12px 24px oklch(0.5 0.008 75 / 0.08),
+   293→      0 4px 8px oklch(0.5 0.008 75 / 0.04),
+   294→      0 0 0 1px oklch(0.88 0.004 75 / 0.6);
+   295→  }
+   296→  .dark .shadow-card {
+   297→    box-shadow:
+   298→      0 1px 2px oklch(0 0 0 / 0.2),
+   299→      0 1px 3px oklch(0 0 0 / 0.15);
+   300→  }
+   301→  .dark .shadow-card-lg {
+   302→    box-shadow:
+   303→      0 4px 8px oklch(0 0 0 / 0.3),
+   304→      0 2px 4px oklch(0 0 0 / 0.2),
+   305→      0 0 0 1px oklch(1 0 0 / 0.04);
+   306→  }
+   307→  .dark .shadow-pop {
+   308→    box-shadow:
+   309→      0 12px 24px oklch(0 0 0 / 0.4),
+   310→      0 4px 8px oklch(0 0 0 / 0.25),
+   311→      0 0 0 1px oklch(1 0 0 / 0.06);
+   312→  }
+   313→
+   314→  /* ── Surfaces ───────────────────────────────────────────── */
+   315→  .surface-glass {
+   316→    backdrop-filter: blur(16px) saturate(1.5);
+   317→    background: oklch(1 0 0 / 0.72);
+   318→    border: 1px solid oklch(1 0 0 / 0.5);
+   319→  }
+   320→  .dark .surface-glass {
+   321→    backdrop-filter: blur(16px) saturate(1.3);
+   322→    background: oklch(0.2 0.012 260 / 0.7);
+   323→    border: 1px solid oklch(1 0 0 / 0.06);
+   324→  }
+   325→  .surface-tinted { background: oklch(0.975 0.003 75); }
+   326→  .dark .surface-tinted { background: oklch(0.17 0.012 260); }
+   327→  .surface-sunken { background: oklch(0.96 0.003 75); }
+   328→  .dark .surface-sunken { background: oklch(0.165 0.012 260); }
+   329→  .surface-raised {
+   330→    background: oklch(1 0 0);
+   331→    box-shadow: 0 1px 0 oklch(0.9 0.003 75 / 1);
+   332→  }
+   333→  .dark .surface-raised {
+   334→    background: oklch(0.2 0.012 260);
+   335→    box-shadow: 0 1px 0 oklch(0.12 0.012 260 / 1);
+   336→  }
+   337→
+   338→  /* ── Focus ring ─────────────────────────────────────────── */
+   339→  .focus-ring {
+   340→    outline: 2px solid oklch(0.45 0.09 178 / 0.45);
+   341→    outline-offset: 2px;
+   342→  }
+   343→  .focus-ring-offset {
+   344→    outline: 2px solid oklch(0.45 0.09 178 / 0.45);
+   345→    outline-offset: 4px;
+   346→  }
+   347→
+   348→  /* ── Sparkline ──────────────────────────────────────────── */
+   349→  .sparkline-track {
+   350→    background: oklch(0.92 0.004 75);
+   351→    border-radius: 2px;
+   352→  }
+   353→  .dark .sparkline-track { background: oklch(0.26 0.012 260); }
+   354→
+   355→  /* ── Metric strip — horizontal KPI band ─────────────────── */
+   356→  .metric-strip {
+   357→    display: grid;
+   358→    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+   359→    background: oklch(1 0 0);
+   360→    border: 1px solid oklch(0.908 0.004 75);
+   361→    border-radius: var(--radius);
+   362→    overflow: hidden;
+   363→  }
+   364→  .dark .metric-strip {
+   365→    background: oklch(0.185 0.012 260);
+   366→    border-color: oklch(1 0 0 / 8%);
+   367→  }
+   368→  .metric-strip > * {
+   369→    padding: 0.75rem 1rem;
+   370→    border-right: 1px solid oklch(0.908 0.004 75);
+   371→  }
+   372→  .dark .metric-strip > * { border-color: oklch(1 0 0 / 6%); }
+   373→  .metric-strip > *:last-child { border-right: 0; }
+   374→
+   375→  /* ── Timeline — vertical with rail ──────────────────────── */
+   376→  .timeline-rail {
+   377→    position: relative;
+   378→    padding-left: 1.5rem;
+   379→  }
+   380→  .timeline-rail::before {
+   381→    content: "";
+   382→    position: absolute;
+   383→    left: 5px;
+   384→    top: 6px;
+   385→    bottom: 6px;
+   386→    width: 1px;
+   387→    background: oklch(0.88 0.004 75);
+   388→  }
+   389→  .dark .timeline-rail::before { background: oklch(1 0 0 / 8%); }
+   390→  .timeline-dot {
+   391→    position: absolute;
+   392→    left: 0;
+   393→    top: 4px;
+   394→    width: 11px;
+   395→    height: 11px;
+   396→    border-radius: 999px;
+   397→    background: oklch(1 0 0);
+   398→    border: 2px solid oklch(0.45 0.09 178);
+   399→    box-shadow: 0 0 0 3px oklch(0.45 0.09 178 / 0.08);
+   400→  }
+   401→  .dark .timeline-dot {
+   402→    background: oklch(0.16 0.012 260);
+   403→    border-color: oklch(0.64 0.1 178);
+   404→    box-shadow: 0 0 0 3px oklch(0.64 0.1 178 / 0.12);
+   405→  }
+   406→  .timeline-dot-done {
+   407→    background: oklch(0.6 0.12 155);
+   408→    border-color: oklch(0.6 0.12 155);
+   409→    box-shadow: 0 0 0 3px oklch(0.6 0.12 155 / 0.12);
+   410→  }
+   411→  .timeline-dot-now {
+   412→    background: oklch(0.7 0.13 70);
+   413→    border-color: oklch(0.7 0.13 70);
+   414→    box-shadow: 0 0 0 3px oklch(0.7 0.13 70 / 0.12);
+   415→  }
+   416→
+   417→  /* ── Section label — uppercase micro-eyebrow ────────────── */
+   418→  .section-label {
+   419→    font-size: 10px;
+   420→    font-weight: 600;
+   421→    letter-spacing: 0.08em;
+   422→    text-transform: uppercase;
+   423→    color: oklch(0.49 0.012 75);
+   424→  }
+   425→  .dark .section-label { color: oklch(0.68 0.015 260); }
+   426→
+   427→  /* ── Status dot — semantic indicator ───────────────────── */
+   428→  .status-dot {
+   429→    width: 7px;
+   430→    height: 7px;
+   431→    border-radius: 999px;
+   432→    display: inline-block;
+   433→    flex-shrink: 0;
+   434→  }
+   435→  .status-dot-success { background: oklch(0.6 0.12 155); box-shadow: 0 0 0 3px oklch(0.6 0.12 155 / 0.14); }
+   436→  .status-dot-warning { background: oklch(0.7 0.13 70); box-shadow: 0 0 0 3px oklch(0.7 0.13 70 / 0.14); }
+   437→  .status-dot-danger { background: oklch(0.56 0.2 25); box-shadow: 0 0 0 3px oklch(0.56 0.2 25 / 0.14); }
+   438→  .status-dot-info { background: oklch(0.55 0.11 240); box-shadow: 0 0 0 3px oklch(0.55 0.11 240 / 0.14); }
+   439→  .status-dot-neutral { background: oklch(0.6 0.008 75); }
+   440→  .dark .status-dot-neutral { background: oklch(0.5 0.008 260); }
+   441→
+   442→  /* ── Keyboard key — kbd styling ─────────────────────────── */
+   443→  .kbd {
+   444→    display: inline-flex;
+   445→    align-items: center;
+   446→    gap: 0.125rem;
+   447→    padding: 0.125rem 0.375rem;
+   448→    border: 1px solid oklch(0.88 0.004 75);
+   449→    border-bottom-width: 2px;
+   450→    border-radius: 4px;
+   451→    background: oklch(1 0 0);
+   452→    font-family: var(--font-mono);
+   453→    font-size: 10px;
+   454→    font-weight: 500;
+   455→    color: oklch(0.49 0.012 75);
+   456→    line-height: 1;
+   457→  }
+   458→  .dark .kbd {
+   459→    background: oklch(0.22 0.012 260);
+   460→    border-color: oklch(1 0 0 / 10%);
+   461→    color: oklch(0.78 0.012 260);
+   462→  }
+   463→
+   464→  /* ── Compact row — dense list item ──────────────────────── */
+   465→  .compact-row {
+   466→    display: flex;
+   467→    align-items: center;
+   468→    gap: 0.75rem;
+   469→    padding: 0.625rem 0.75rem;
+   470→    border-radius: 6px;
+   471→    transition: background-color 0.15s ease;
+   472→  }
+   473→  .compact-row:hover { background: oklch(0.96 0.004 75); }
+   474→  .dark .compact-row:hover { background: oklch(0.22 0.012 260); }
+   475→
+   476→  /* ── Divider with label ──────────────────────────────────── */
+   477→  .divider-label {
+   478→    display: flex;
+   479→    align-items: center;
+   480→    gap: 0.75rem;
+   481→  }
+   482→  .divider-label::after,
+   483→  .divider-label::before {
+   484→    content: "";
+   485→    flex: 1;
+   486→    height: 1px;
+   487→    background: oklch(0.908 0.004 75);
+   488→  }
+   489→  .dark .divider-label::after,
+   490→  .dark .divider-label::before { background: oklch(1 0 0 / 8%); }
+   491→
+   492→  /* ── Premium accent bar (active states) ──────────────────── */
+   493→  .accent-bar-left {
+   494→    position: relative;
+   495→  }
+   496→  .accent-bar-left::before {
+   497→    content: "";
+   498→    position: absolute;
+   499→    left: 0;
+   500→    top: 50%;
+   501→    transform: translateY(-50%);
+   502→    height: 60%;
+   503→    width: 2px;
+   504→    border-radius: 999px;
+   505→    background: oklch(0.62 0.1 178);
+   506→  }
+   507→
+   508→  /* ── Subtle entrance ─────────────────────────────────────── */
+   509→  .animate-rise {
+   510→    animation: rise 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+   511→  }
+   512→  @keyframes rise {
+   513→    from { opacity: 0; transform: translateY(6px); }
+   514→    to { opacity: 1; transform: translateY(0); }
+   515→  }
+   516→  .animate-rise-delay-1 { animation-delay: 0.04s; }
+   517→  .animate-rise-delay-2 { animation-delay: 0.08s; }
+   518→  .animate-rise-delay-3 { animation-delay: 0.12s; }
+   519→  .animate-rise-delay-4 { animation-delay: 0.16s; }
+   520→
+   521→  /* ── Reduced motion ─────────────────────────────────────── */
+   522→  @media (prefers-reduced-motion: reduce) {
+   523→    *, *::before, *::after {
+   524→      animation-duration: 0.01ms !important;
+   525→      animation-iteration-count: 1 !important;
+   526→      transition-duration: 0.01ms !important;
+   527→      scroll-behavior: auto !important;
+   528→    }
+   529→  }
+   530→}
+   531→
+   532→/* ============================================================
+   533→   ANIMATIONS — restrained, fast (150–250ms)
+   534→   ============================================================ */
+   535→@keyframes shimmer {
+   536→  0% { background-position: -800px 0; }
+   537→  100% { background-position: 800px 0; }
+   538→}
+   539→.animate-shimmer {
+   540→  animation: shimmer 1.8s infinite linear;
+   541→  background: linear-gradient(90deg, transparent, oklch(0.88 0.004 75 / 0.4), transparent);
+   542→  background-size: 800px 100%;
+   543→}
+   544→
+   545→@keyframes pulse-ring {
+   546→  0% { box-shadow: 0 0 0 0 oklch(0.62 0.1 178 / 0.4); }
+   547→  70% { box-shadow: 0 0 0 8px oklch(0.62 0.1 178 / 0); }
+   548→  100% { box-shadow: 0 0 0 0 oklch(0.62 0.1 178 / 0); }
+   549→}
+   550→.animate-pulse-ring { animation: pulse-ring 2s infinite; }
+   551→
+   552→@keyframes fade-in-up {
+   553→  from { opacity: 0; transform: translateY(4px); }
+   554→  to { opacity: 1; transform: translateY(0); }
+   555→}
+   556→.animate-fade-in-up { animation: fade-in-up 0.2s ease-out; }
+   557→
+   558→@keyframes skeleton-pulse {
+   559→  0%, 100% { opacity: 1; }
+   560→  50% { opacity: 0.5; }
+   561→}
+   562→.animate-skeleton { animation: skeleton-pulse 1.5s ease-in-out infinite; }
+   563→
+   564→/* Selection */
+   565→::selection {
+   566→  background: oklch(0.62 0.1 178 / 0.18);
+   567→  color: oklch(0.21 0.015 75);
+   568→}
+   569→.dark ::selection {
+   570→  background: oklch(0.64 0.1 178 / 0.3);
+   571→  color: oklch(0.97 0.005 260);
+   572→}
+   573→
+   574→/* ============================================================
+   575→   PREMIUM DESIGN SYSTEM — iOS / visionOS Inspired
+   576→   Multi-accent · glassmorphism · depth · spring motion
+   577→   Layered above the existing enterprise OS primitives.
+   578→   ============================================================ */
+   579→@layer utilities {
+   580→
+   581→  /* ── AMBIENT BACKGROUND DEPTH ─────────────────────────────
+   582→     Extremely subtle color fields + blurred blobs. Sits behind
+   583→     the content layer; never distracts. */
+   584→  .bg-ambient {
+   585→    background-color: var(--background);
+   586→    background-image:
+   587→      radial-gradient(60rem 40rem at 12% -8%, var(--glow-teal), transparent 60%),
+   588→      radial-gradient(50rem 35rem at 88% 6%, var(--glow-violet), transparent 65%),
+   589→      radial-gradient(45rem 30rem at 92% 92%, var(--glow-blue), transparent 70%),
+   590→      radial-gradient(40rem 28rem at 6% 96%, var(--glow-amber), transparent 70%);
+   591→  }
+   592→  .dark .bg-ambient {
+   593→    background-image:
+   594→      radial-gradient(60rem 40rem at 12% -8%, oklch(0.55 0.1 185 / 0.14), transparent 60%),
+   595→      radial-gradient(50rem 35rem at 88% 6%, oklch(0.58 0.17 290 / 0.12), transparent 65%),
+   596→      radial-gradient(45rem 30rem at 92% 92%, oklch(0.6 0.17 235 / 0.1), transparent 70%);
+   597→  }
+   598→  /* Mesh orbs — decorative blurred shapes (place absolutely, -z) */
+   599→  .orb {
+   600→    position: absolute;
+   601→    border-radius: 999px;
+   602→    filter: blur(64px);
+   603→    opacity: 0.6;
+   604→    pointer-events: none;
+   605→  }
+   606→  .orb-teal { background: radial-gradient(circle at center, var(--glow-teal), transparent 70%); }
+   607→  .orb-violet { background: radial-gradient(circle at center, var(--glow-violet), transparent 70%); }
+   608→  .orb-blue { background: radial-gradient(circle at center, var(--glow-blue), transparent 70%); }
+   609→  .orb-amber { background: radial-gradient(circle at center, var(--glow-amber), transparent 70%); }
+   610→  .orb-rose { background: radial-gradient(circle at center, var(--glow-rose), transparent 70%); }
+   611→  .dark .orb { opacity: 0.35; }
+   612→
+   613→  /* ── PREMIUM GLASS SURFACES ──────────────────────────────
+   614→     More layered than .surface-glass: subtle inner highlight,
+   615→     hairline gradient border, very soft shadow. */
+   616→  .glass-panel {
+   617→    backdrop-filter: blur(20px) saturate(1.6);
+   618→    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+   619→    background: linear-gradient(180deg, oklch(1 0 0 / 0.78), oklch(1 0 0 / 0.68));
+   620→    border: 1px solid oklch(1 0 0 / 0.6);
+   621→    box-shadow:
+   622→      0 1px 0 oklch(1 0 0 / 0.9) inset,
+   623→      0 1px 2px oklch(0.5 0.008 75 / 0.06),
+   624→      0 8px 24px oklch(0.5 0.008 75 / 0.05);
+   625→  }
+   626→  .dark .glass-panel {
+   627→    background: linear-gradient(180deg, oklch(0.22 0.012 260 / 0.78), oklch(0.2 0.012 260 / 0.7));
+   628→    border: 1px solid oklch(1 0 0 / 0.08);
+   629→    box-shadow:
+   630→      0 1px 0 oklch(1 0 0 / 0.06) inset,
+   631→      0 1px 2px oklch(0 0 0 / 0.3),
+   632→      0 8px 24px oklch(0 0 0 / 0.18);
+   633→  }
+   634→  /* Glass with subtle accent tint — for AI areas, selected states */
+   635→  .glass-panel-ai {
+   636→    backdrop-filter: blur(20px) saturate(1.6);
+   637→    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+   638→    background: linear-gradient(135deg, oklch(0.52 0.16 235 / 0.08), oklch(0.56 0.17 290 / 0.08));
+   639→    border: 1px solid oklch(0.55 0.16 240 / 0.18);
+   640→    box-shadow:
+   641→      0 1px 0 oklch(1 0 0 / 0.5) inset,
+   642→      0 8px 24px oklch(0.52 0.16 235 / 0.1);
+   643→  }
+   644→  .dark .glass-panel-ai {
+   645→    background: linear-gradient(135deg, oklch(0.64 0.16 235 / 0.14), oklch(0.66 0.17 290 / 0.14));
+   646→    border: 1px solid oklch(0.64 0.16 240 / 0.25);
+   647→  }
+   648→  /* Top bar glass — slightly more opaque for readability */
+   649→  .glass-bar {
+   650→    backdrop-filter: blur(16px) saturate(1.5);
+   651→    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+   652→    background: linear-gradient(180deg, oklch(1 0 0 / 0.86), oklch(1 0 0 / 0.76));
+   653→    border-bottom: 1px solid oklch(0.9 0.004 75 / 0.7);
+   654→    box-shadow: 0 1px 0 oklch(1 0 0 / 0.8) inset;
+   655→  }
+   656→  .dark .glass-bar {
+   657→    background: linear-gradient(180deg, oklch(0.18 0.012 260 / 0.86), oklch(0.16 0.012 260 / 0.8));
+   658→    border-bottom-color: oklch(1 0 0 / 0.06);
+   659→  }
+   660→
+   661→  /* ── GRADIENT TEXT ─────────────────────────────────────── */
+   662→  .gradient-text-primary {
+   663→    background: var(--gradient-primary);
+   664→    -webkit-background-clip: text;
+   665→    background-clip: text;
+   666→    -webkit-text-fill-color: transparent;
+   667→    color: transparent;
+   668→  }
+   669→  .gradient-text-ai {
+   670→    background: var(--gradient-ai);
+   671→    -webkit-background-clip: text;
+   672→    background-clip: text;
+   673→    -webkit-text-fill-color: transparent;
+   674→    color: transparent;
+   675→  }
+   676→  .gradient-text-warm {
+   677→    background: var(--gradient-warm);
+   678→    -webkit-background-clip: text;
+   679→    background-clip: text;
+   680→    -webkit-text-fill-color: transparent;
+   681→    color: transparent;
+   682→  }
+   683→
+   684→  /* ── PREMIUM BUTTONS ─────────────────────────────────────
+   685→     Use as additional className on Button or any element.
+   686→     Tactile: hover elevates, active scales 0.97. */
+   687→  .btn-gradient-primary {
+   688→    background: var(--gradient-primary);
+   689→    color: oklch(0.99 0.005 178);
+   690→    box-shadow:
+   691→      0 1px 0 oklch(1 0 0 / 0.25) inset,
+   692→      0 1px 2px oklch(0.45 0.09 178 / 0.3),
+   693→      0 4px 12px oklch(0.45 0.09 178 / 0.18);
+   694→    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+   695→  }
+   696→  .btn-gradient-primary:hover {
+   697→    filter: brightness(1.06);
+   698→    box-shadow:
+   699→      0 1px 0 oklch(1 0 0 / 0.3) inset,
+   700→      0 2px 4px oklch(0.45 0.09 178 / 0.35),
+   701→      0 6px 18px oklch(0.45 0.09 178 / 0.24);
+   702→  }
+   703→  .btn-gradient-primary:active { transform: scale(0.97); }
+   704→
+   705→  .btn-gradient-ai {
+   706→    background: var(--gradient-ai);
+   707→    color: oklch(0.99 0.005 260);
+   708→    box-shadow:
+   709→      0 1px 0 oklch(1 0 0 / 0.25) inset,
+   710→      0 1px 2px oklch(0.55 0.16 240 / 0.3),
+   711→      0 4px 14px oklch(0.55 0.16 290 / 0.22);
+   712→    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+   713→  }
+   714→  .btn-gradient-ai:hover {
+   715→    filter: brightness(1.06);
+   716→    box-shadow:
+   717→      0 1px 0 oklch(1 0 0 / 0.3) inset,
+   718→      0 2px 4px oklch(0.55 0.16 240 / 0.4),
+   719→      0 6px 20px oklch(0.55 0.16 290 / 0.3);
+   720→  }
+   721→  .btn-gradient-ai:active { transform: scale(0.97); }
+   722→
+   723→  .btn-gradient-success {
+   724→    background: var(--gradient-success);
+   725→    color: oklch(0.99 0.005 155);
+   726→    box-shadow:
+   727→      0 1px 0 oklch(1 0 0 / 0.25) inset,
+   728→      0 4px 12px oklch(0.55 0.12 155 / 0.2);
+   729→    transition: transform 0.15s ease, filter 0.2s ease;
+   730→  }
+   731→  .btn-gradient-success:hover { filter: brightness(1.05); }
+   732→  .btn-gradient-success:active { transform: scale(0.97); }
+   733→
+   734→  .btn-gradient-danger {
+   735→    background: linear-gradient(135deg, oklch(0.62 0.19 25), oklch(0.56 0.2 15));
+   736→    color: oklch(0.99 0.005 25);
+   737→    box-shadow:
+   738→      0 1px 0 oklch(1 0 0 / 0.22) inset,
+   739→      0 1px 2px oklch(0.6 0.18 25 / 0.3),
+   740→      0 4px 12px oklch(0.6 0.18 25 / 0.2);
+   741→    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+   742→  }
+   743→  .btn-gradient-danger:hover {
+   744→    filter: brightness(1.06);
+   745→    box-shadow:
+   746→      0 1px 0 oklch(1 0 0 / 0.28) inset,
+   747→      0 2px 4px oklch(0.6 0.18 25 / 0.36),
+   748→      0 6px 18px oklch(0.6 0.18 25 / 0.26);
+   749→  }
+   750→  .btn-gradient-danger:active { transform: scale(0.97); }
+   751→
+   752→  .btn-gradient-warm {
+   753→    background: var(--gradient-warm);
+   754→    color: oklch(0.99 0.005 65);
+   755→    box-shadow:
+   756→      0 1px 0 oklch(1 0 0 / 0.25) inset,
+   757→      0 4px 12px oklch(0.68 0.15 45 / 0.22);
+   758→    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+   759→  }
+   760→  .btn-gradient-warm:hover { filter: brightness(1.05); }
+   761→  .btn-gradient-warm:active { transform: scale(0.97); }
+   762→
+   763→  .btn-gradient-violet {
+   764→    background: var(--gradient-violet);
+   765→    color: oklch(0.99 0.005 290);
+   766→    box-shadow:
+   767→      0 1px 0 oklch(1 0 0 / 0.25) inset,
+   768→      0 4px 12px oklch(0.56 0.16 285 / 0.24);
+   769→    transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+   770→  }
+   771→  .btn-gradient-violet:hover { filter: brightness(1.06); }
+   772→  .btn-gradient-violet:active { transform: scale(0.97); }
+   773→
+   774→  .btn-glass {
+   775→    backdrop-filter: blur(12px) saturate(1.4);
+   776→    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+   777→    background: oklch(1 0 0 / 0.7);
+   778→    border: 1px solid oklch(1 0 0 / 0.5);
+   779→    color: oklch(0.25 0.015 75);
+   780→    box-shadow: 0 1px 0 oklch(1 0 0 / 0.6) inset, 0 1px 2px oklch(0.5 0.008 75 / 0.06);
+   781→    transition: transform 0.15s ease, background 0.2s ease;
+   782→  }
+   783→  .btn-glass:hover { background: oklch(1 0 0 / 0.85); }
+   784→  .btn-glass:active { transform: scale(0.97); }
+   785→  .dark .btn-glass {
+   786→    background: oklch(0.22 0.012 260 / 0.6);
+   787→    border: 1px solid oklch(1 0 0 / 0.08);
+   788→    color: oklch(0.92 0.005 260);
+   789→  }
+   790→  .dark .btn-glass:hover { background: oklch(0.26 0.012 260 / 0.8); }
+   791→
+   792→  /* Tactile press for any element */
+   793→  .press-tactile { transition: transform 0.12s cubic-bezier(0.4, 0, 0.2, 1); }
+   794→  .press-tactile:active { transform: scale(0.97); }
+   795→
+   796→  /* ── PREMIUM CARDS ───────────────────────────────────────
+   797→     Hover elevation + soft internal glow + hairline accent edge.
+   798→     Do NOT apply to data-heavy tables. */
+   799→  .card-premium {
+   800→    position: relative;
+   801→    background: oklch(1 0 0);
+   802→    border: 1px solid oklch(0.9 0.004 75);
+   803→    border-radius: var(--radius);
+   804→    box-shadow: 0 1px 2px oklch(0.5 0.008 75 / 0.04);
+   805→    transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+   806→  }
+   807→  .card-premium:hover {
+   808→    box-shadow:
+   809→      0 1px 2px oklch(0.5 0.008 75 / 0.05),
+   810→      0 8px 24px oklch(0.5 0.008 75 / 0.07);
+   811→    transform: translateY(-1px);
+   812→    border-color: oklch(0.86 0.006 75);
+   813→  }
+   814→  .dark .card-premium {
+   815→    background: oklch(0.19 0.012 260);
+   816→    border-color: oklch(1 0 0 / 0.07);
+   817→  }
+   818→  .dark .card-premium:hover {
+   819→    border-color: oklch(1 0 0 / 0.1);
+   820→    box-shadow: 0 8px 24px oklch(0 0 0 / 0.25);
+   821→  }
+   822→  /* Gradient accent edge — top hairline */
+   823→  .card-premium-accent::before {
+   824→    content: "";
+   825→    position: absolute;
+   826→    inset: 0 0 auto 0;
+   827→    height: 2px;
+   828→    border-radius: var(--radius) var(--radius) 0 0;
+   829→    background: var(--gradient-primary);
+   830→    opacity: 0.85;
+   831→    pointer-events: none;
+   832→  }
+   833→  .card-premium-accent-ai::before { background: var(--gradient-ai); }
+   834→  .card-premium-accent-warm::before { background: var(--gradient-warm); }
+   835→  .card-premium-accent-violet::before { background: var(--gradient-violet); }
+   836→  .card-premium-accent-success::before { background: var(--gradient-success); }
+   837→  .card-premium-accent-sunset::before { background: var(--gradient-sunset); }
+   838→
+   839→  /* Hero glass card — used on dashboard hero, AI panel */
+   840→  .card-hero {
+   841→    position: relative;
+   842→    overflow: hidden;
+   843→    backdrop-filter: blur(20px) saturate(1.6);
+   844→    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+   845→    background: linear-gradient(135deg, oklch(0.48 0.1 178 / 0.96), oklch(0.42 0.08 200 / 0.94));
+   846→    color: oklch(0.99 0.005 178);
+   847→    border: 1px solid oklch(1 0 0 / 0.18);
+   848→    border-radius: calc(var(--radius) + 4px);
+   849→    box-shadow:
+   850→      0 1px 0 oklch(1 0 0 / 0.2) inset,
+   851→      0 12px 32px oklch(0.4 0.08 180 / 0.18),
+   852→      0 2px 6px oklch(0.4 0.08 180 / 0.1);
+   853→  }
+   854→  .dark .card-hero {
+   855→    background: linear-gradient(135deg, oklch(0.3 0.1 178 / 0.96), oklch(0.26 0.08 200 / 0.94));
+   856→  }
+   857→  /* AI hero variant — blue→violet */
+   858→  .card-hero-ai {
+   859→    background: linear-gradient(135deg, oklch(0.5 0.16 235 / 0.96), oklch(0.46 0.15 290 / 0.94));
+   860→    color: oklch(0.99 0.005 260);
+   861→    border-color: oklch(1 0 0 / 0.2);
+   862→    box-shadow:
+   863→      0 1px 0 oklch(1 0 0 / 0.2) inset,
+   864→      0 12px 32px oklch(0.45 0.15 240 / 0.22);
+   865→  }
+   866→
+   867→  /* ── STATUS PILLS — premium, semantic ───────────────────── */
+   868→  .pill {
+   869→    display: inline-flex;
+   870→    align-items: center;
+   871→    gap: 0.3rem;
+   872→    padding: 0.15rem 0.55rem;
+   873→    border-radius: 999px;
+   874→    font-size: 10.5px;
+   875→    font-weight: 600;
+   876→    letter-spacing: 0.01em;
+   877→    border: 1px solid transparent;
+   878→    line-height: 1.4;
+   879→    white-space: nowrap;
+   880→  }
+   881→  .pill-teal { background: oklch(0.55 0.1 185 / 0.12); color: oklch(0.42 0.09 178); border-color: oklch(0.55 0.1 185 / 0.22); }
+   882→  .pill-emerald { background: oklch(0.6 0.12 155 / 0.12); color: oklch(0.4 0.11 155); border-color: oklch(0.6 0.12 155 / 0.22); }
+   883→  .pill-amber { background: oklch(0.7 0.14 65 / 0.14); color: oklch(0.5 0.11 65); border-color: oklch(0.7 0.14 65 / 0.25); }
+   884→  .pill-coral { background: oklch(0.65 0.16 25 / 0.12); color: oklch(0.5 0.14 25); border-color: oklch(0.65 0.16 25 / 0.24); }
+   885→  .pill-rose { background: oklch(0.62 0.18 15 / 0.12); color: oklch(0.5 0.16 15); border-color: oklch(0.62 0.18 15 / 0.22); }
+   886→  .pill-violet { background: oklch(0.58 0.17 290 / 0.12); color: oklch(0.45 0.15 290); border-color: oklch(0.58 0.17 290 / 0.22); }
+   887→  .pill-indigo { background: oklch(0.5 0.15 265 / 0.12); color: oklch(0.4 0.13 265); border-color: oklch(0.5 0.15 265 / 0.22); }
+   888→  .pill-electric { background: oklch(0.6 0.17 235 / 0.12); color: oklch(0.45 0.15 235); border-color: oklch(0.6 0.17 235 / 0.22); }
+   889→  .pill-neutral { background: oklch(0.6 0.008 75 / 0.08); color: oklch(0.4 0.01 75); border-color: oklch(0.6 0.008 75 / 0.15); }
+   890→  .dark .pill-teal { background: oklch(0.64 0.1 185 / 0.18); color: oklch(0.78 0.1 185); border-color: oklch(0.64 0.1 185 / 0.3); }
+   891→  .dark .pill-emerald { background: oklch(0.66 0.12 155 / 0.18); color: oklch(0.8 0.1 155); border-color: oklch(0.66 0.12 155 / 0.3); }
+   892→  .dark .pill-amber { background: oklch(0.75 0.14 65 / 0.2); color: oklch(0.85 0.11 65); border-color: oklch(0.75 0.14 65 / 0.32); }
+   893→  .dark .pill-coral { background: oklch(0.7 0.16 25 / 0.2); color: oklch(0.85 0.12 25); border-color: oklch(0.7 0.16 25 / 0.32); }
+   894→  .dark .pill-rose { background: oklch(0.68 0.18 15 / 0.2); color: oklch(0.85 0.13 15); border-color: oklch(0.68 0.18 15 / 0.32); }
+   895→  .dark .pill-violet { background: oklch(0.68 0.17 290 / 0.2); color: oklch(0.84 0.13 290); border-color: oklch(0.68 0.17 290 / 0.32); }
+   896→  .dark .pill-indigo { background: oklch(0.62 0.15 265 / 0.2); color: oklch(0.84 0.11 265); border-color: oklch(0.62 0.15 265 / 0.32); }
+   897→  .dark .pill-electric { background: oklch(0.68 0.17 235 / 0.2); color: oklch(0.84 0.13 235); border-color: oklch(0.68 0.17 235 / 0.32); }
+   898→  .dark .pill-neutral { background: oklch(0.5 0.008 260 / 0.18); color: oklch(0.78 0.008 260); border-color: oklch(0.5 0.008 260 / 0.3); }
+   899→
+   900→  /* ── ICON TILES — semantic, gradient-tinted ─────────────── */
+   901→  .icon-tile {
+   902→    display: grid;
+   903→    place-items: center;
+   904→    border-radius: 10px;
+   905→    flex-shrink: 0;
+   906→    transition: transform 0.15s ease, background 0.2s ease;
+   907→  }
+   908→  .icon-tile-teal { background: var(--gradient-primary-soft); color: oklch(0.42 0.09 178); }
+   909→  .icon-tile-emerald { background: oklch(0.6 0.12 155 / 0.12); color: oklch(0.42 0.11 155); }
+   910→  .icon-tile-amber { background: oklch(0.7 0.14 65 / 0.14); color: oklch(0.5 0.11 65); }
+   911→  .icon-tile-coral { background: oklch(0.65 0.16 25 / 0.12); color: oklch(0.5 0.14 25); }
+   912→  .icon-tile-rose { background: oklch(0.62 0.18 15 / 0.12); color: oklch(0.5 0.16 15); }
+   913→  .icon-tile-violet { background: oklch(0.58 0.17 290 / 0.12); color: oklch(0.45 0.15 290); }
+   914→  .icon-tile-indigo { background: oklch(0.5 0.15 265 / 0.12); color: oklch(0.4 0.13 265); }
+   915→  .icon-tile-electric { background: oklch(0.6 0.17 235 / 0.12); color: oklch(0.45 0.15 235); }
+   916→  .icon-tile-ai { background: var(--gradient-ai-soft); color: oklch(0.5 0.16 240); }
+   917→  .dark .icon-tile-teal { background: oklch(0.64 0.1 185 / 0.18); color: oklch(0.82 0.1 185); }
+   918→  .dark .icon-tile-emerald { background: oklch(0.66 0.12 155 / 0.18); color: oklch(0.82 0.1 155); }
+   919→  .dark .icon-tile-amber { background: oklch(0.75 0.14 65 / 0.2); color: oklch(0.86 0.11 65); }
+   920→  .dark .icon-tile-coral { background: oklch(0.7 0.16 25 / 0.2); color: oklch(0.86 0.12 25); }
+   921→  .dark .icon-tile-rose { background: oklch(0.68 0.18 15 / 0.2); color: oklch(0.86 0.13 15); }
+   922→  .dark .icon-tile-violet { background: oklch(0.68 0.17 290 / 0.2); color: oklch(0.84 0.13 290); }
+   923→  .dark .icon-tile-indigo { background: oklch(0.62 0.15 265 / 0.2); color: oklch(0.84 0.11 265); }
+   924→  .dark .icon-tile-electric { background: oklch(0.68 0.17 235 / 0.2); color: oklch(0.84 0.13 235); }
+   925→  .dark .icon-tile-ai { background: oklch(0.64 0.16 235 / 0.18); color: oklch(0.84 0.13 235); }
+   926→
+   927→  /* ── PREMIUM FOCUS GLOW ────────────────────────────────── */
+   928→  .focus-glow {
+   929→    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+   930→  }
+   931→  .focus-glow:focus,
+   932→  .focus-glow:focus-within {
+   933→    border-color: oklch(0.55 0.1 178 / 0.6);
+   934→    box-shadow: 0 0 0 3px oklch(0.55 0.1 178 / 0.18);
+   935→  }
+   936→
+   937→  /* ── NAV ACTIVE — gradient highlight + glow ────────────── */
+   938→  .nav-active {
+   939→    background: linear-gradient(180deg, oklch(0.62 0.1 178 / 0.22), oklch(0.62 0.1 178 / 0.1));
+   940→    color: oklch(0.99 0.005 178);
+   941→    box-shadow:
+   942→      inset 0 1px 0 oklch(1 0 0 / 0.08),
+   943→      0 4px 14px oklch(0.45 0.09 178 / 0.18);
+   944→  }
+   945→  .nav-active-bar {
+   946→    position: absolute;
+   947→    left: 0;
+   948→    top: 50%;
+   949→    transform: translateY(-50%);
+   950→    width: 3px;
+   951→    height: 60%;
+   952→    border-radius: 999px;
+   953→    background: var(--gradient-primary);
+   954→    box-shadow: 0 0 8px oklch(0.62 0.1 178 / 0.6);
+   955→  }
+   956→
+   957→  /* ── PROGRESS BARS — gradient + soft glow ──────────────── */
+   958→  .progress-track-premium {
+   959→    background: oklch(0.9 0.004 75 / 0.7);
+   960→    border-radius: 999px;
+   961→    overflow: hidden;
+   962→    position: relative;
+   963→  }
+   964→  .dark .progress-track-premium { background: oklch(1 0 0 / 0.08); }
+   965→  .progress-fill-primary {
+   966→    background: var(--gradient-primary);
+   967→    border-radius: 999px;
+   968→    box-shadow: 0 0 8px oklch(0.5 0.1 178 / 0.4);
+   969→    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+   970→  }
+   971→  .progress-fill-ai {
+   972→    background: var(--gradient-ai);
+   973→    border-radius: 999px;
+   974→    box-shadow: 0 0 8px oklch(0.55 0.16 240 / 0.4);
+   975→    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+   976→  }
+   977→  .progress-fill-success {
+   978→    background: var(--gradient-success);
+   979→    border-radius: 999px;
+   980→    box-shadow: 0 0 8px oklch(0.6 0.12 155 / 0.4);
+   981→    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+   982→  }
+   983→  .progress-fill-warm {
+   984→    background: var(--gradient-warm);
+   985→    border-radius: 999px;
+   986→    box-shadow: 0 0 8px oklch(0.7 0.14 65 / 0.4);
+   987→    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+   988→  }
+   989→  .progress-fill-violet {
+   990→    background: var(--gradient-violet);
+   991→    border-radius: 999px;
+   992→    box-shadow: 0 0 8px oklch(0.58 0.17 290 / 0.4);
+   993→    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+   994→  }
+   995→
+   996→  /* ── SOFT GLOW SHADOWS (for ambient highlights) ───────── */
+   997→  .glow-primary { box-shadow: 0 0 0 1px oklch(0.5 0.1 178 / 0.1), 0 8px 24px oklch(0.45 0.09 178 / 0.14); }
+   998→  .glow-ai { box-shadow: 0 0 0 1px oklch(0.55 0.16 240 / 0.12), 0 8px 24px oklch(0.55 0.16 290 / 0.16); }
+   999→  .glow-success { box-shadow: 0 0 0 1px oklch(0.6 0.12 155 / 0.12), 0 8px 24px oklch(0.55 0.12 155 / 0.14); }
+  1000→  .glow-warm { box-shadow: 0 0 0 1px oklch(0.7 0.14 65 / 0.14), 0 8px 24px oklch(0.65 0.16 25 / 0.14); }
+  1001→
+  1002→  /* ── PREMIUM SKELETON — shimmer with gradient sweep ────── */
+  1003→  .skeleton-premium {
+  1004→    position: relative;
+  1005→    overflow: hidden;
+  1006→    background: oklch(0.94 0.004 75 / 0.8);
+  1007→    border-radius: 6px;
+  1008→  }
+  1009→  .dark .skeleton-premium { background: oklch(1 0 0 / 0.06); }
+  1010→  .skeleton-premium::after {
+  1011→    content: "";
+  1012→    position: absolute;
+  1013→    inset: 0;
+  1014→    background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.5), transparent);
+  1015→    transform: translateX(-100%);
+  1016→    animation: premium-sweep 1.6s infinite;
+  1017→  }
+  1018→  .dark .skeleton-premium::after { background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.08), transparent); }
+  1019→  @keyframes premium-sweep {
+  1020→    100% { transform: translateX(100%); }
+  1021→  }
+  1022→
+  1023→  /* ── SHEET / DRAWER — iOS sheet feel ───────────────────── */
+  1024→  .sheet-premium {
+  1025→    backdrop-filter: blur(24px) saturate(1.6);
+  1026→    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  1027→    background: oklch(1 0 0 / 0.9);
+  1028→    box-shadow:
+  1029→      0 -1px 0 oklch(1 0 0 / 0.6) inset,
+  1030→      0 -12px 40px oklch(0.5 0.008 75 / 0.12);
+  1031→  }
+  1032→  .dark .sheet-premium {
+  1033→    background: oklch(0.2 0.012 260 / 0.92);
+  1034→    box-shadow: 0 -12px 40px oklch(0 0 0 / 0.4);
+  1035→  }
+  1036→  /* Backdrop for modals — dim + blur */
+  1037→  .backdrop-premium {
+  1038→    backdrop-filter: blur(6px) saturate(1.2);
+  1039→    -webkit-backdrop-filter: blur(6px) saturate(1.2);
+  1040→    background: oklch(0.21 0.015 75 / 0.32);
+  1041→  }
+  1042→  .dark .backdrop-premium { background: oklch(0 0 0 / 0.5); }
+  1043→
+  1044→  /* ── HOVER LIFT UTILITY ────────────────────────────────── */
+  1045→  .hover-lift {
+  1046→    transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease;
+  1047→  }
+  1048→  .hover-lift:hover {
+  1049→    transform: translateY(-2px);
+  1050→  }
+  1051→  .hover-glow:hover {
+  1052→    box-shadow: 0 0 0 1px oklch(0.55 0.1 178 / 0.16), 0 6px 20px oklch(0.45 0.09 178 / 0.12);
+  1053→  }
+  1054→
+  1055→  /* ── AI INDICATOR — animated thinking dots ─────────────── */
+  1056→  .ai-thinking {
+  1057→    display: inline-flex;
+  1058→    align-items: center;
+  1059→    gap: 3px;
+  1060→  }
+  1061→  .ai-thinking span {
+  1062→    width: 4px;
+  1063→    height: 4px;
+  1064→    border-radius: 999px;
+  1065→    background: var(--gradient-ai);
+  1066→    animation: ai-pulse 1.2s infinite ease-in-out;
+  1067→  }
+  1068→  .ai-thinking span:nth-child(2) { animation-delay: 0.15s; }
+  1069→  .ai-thinking span:nth-child(3) { animation-delay: 0.3s; }
+  1070→  @keyframes ai-pulse {
+  1071→    0%, 80%, 100% { opacity: 0.3; transform: scale(0.7); }
+  1072→    40% { opacity: 1; transform: scale(1); }
+  1073→  }
+  1074→
+  1075→  /* ── SUBTLE SCALE-IN entrance ──────────────────────────── */
+  1076→  .animate-scale-in {
+  1077→    animation: scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+  1078→  }
+  1079→  @keyframes scale-in {
+  1080→    from { opacity: 0; transform: scale(0.96); }
+  1081→    to { opacity: 1; transform: scale(1); }
+  1082→  }
+  1083→
+  1084→  /* ── PREMIUM SLIDE-IN (drawers, popovers) ──────────────── */
+  1085→  .animate-slide-up {
+  1086→    animation: slide-up 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  1087→  }
+  1088→  @keyframes slide-up {
+  1089→    from { opacity: 0; transform: translateY(8px); }
+  1090→    to { opacity: 1; transform: translateY(0); }
+  1091→  }
+  1092→
+  1093→  /* ── GRADIENT BORDER UTILITY (for special cards) ───────── */
+  1094→  .border-gradient-ai {
+  1095→    position: relative;
+  1096→    background-clip: padding-box;
+  1097→    border: 1px solid transparent;
+  1098→  }
+  1099→  .border-gradient-ai::before {
+  1100→    content: "";
+  1101→    position: absolute;
+  1102→    inset: 0;
+  1103→    border-radius: inherit;
+  1104→    padding: 1px;
+  1105→    background: var(--gradient-ai);
+  1106→    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  1107→    -webkit-mask-composite: xor;
+  1108→    mask-composite: exclude;
+  1109→    pointer-events: none;
+  1110→  }
+  1111→
+  1112→  /* ── REDUCED MOTION — disable premium motion ───────────── */
+  1113→  @media (prefers-reduced-motion: reduce) {
+  1114→    .btn-gradient-primary, .btn-gradient-ai, .btn-gradient-success,
+  1115→    .btn-gradient-danger, .btn-gradient-warm, .btn-gradient-violet,
+  1116→    .btn-glass, .press-tactile, .card-premium, .hover-lift,
+  1117→    .progress-fill-primary, .progress-fill-ai, .progress-fill-success,
+  1118→    .progress-fill-warm, .progress-fill-violet {
+  1119→      transition: none !important;
+  1120→      animation: none !important;
+  1121→    }
+  1122→    .btn-gradient-primary:active, .btn-gradient-ai:active,
+  1123→    .btn-gradient-success:active, .btn-gradient-danger:active,
+  1124→    .btn-gradient-warm:active, .btn-gradient-violet:active,
+  1125→    .btn-glass:active,
+  1126→    .press-tactile:active { transform: none !important; }
+  1127→    .card-premium:hover, .hover-lift:hover { transform: none !important; }
+  1128→    .skeleton-premium::after { animation: none !important; }
+  1129→    .ai-thinking span { animation: none !important; opacity: 0.6 !important; }
+  1130→    .animate-scale-in, .animate-slide-up { animation: none !important; opacity: 1 !important; transform: none !important; }
+  1131→  }
+  1132→}
+  1133→

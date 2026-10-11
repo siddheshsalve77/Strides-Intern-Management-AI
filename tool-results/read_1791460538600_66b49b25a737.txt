@@ -1,0 +1,1305 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect, useRef, useCallback } from 'react'
+     4→import { useApp } from '@/lib/store'
+     5→import { Card } from '@/components/ui/card'
+     6→import { Button } from '@/components/ui/button'
+     7→import { Badge } from '@/components/ui/badge'
+     8→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+     9→import { Textarea } from '@/components/ui/textarea'
+    10→import { Input } from '@/components/ui/input'
+    11→import { Label } from '@/components/ui/label'
+    12→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+    13→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
+    14→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    15→import { PageHeader, EmptyState, MetricStrip, Timeline, CompactRow, StatusDot, SectionLabel, RowSkeleton } from '@/components/portal/ui-helpers'
+    16→import { CelebrationOverlay } from '@/components/portal/celebration'
+    17→import { KanbanBoard } from '@/components/portal/kanban-board'
+    18→import { TaskCompletionTrend } from '@/components/portal/task-completion-trend'
+    19→import { authedFetch } from '@/lib/firebase-auth'
+    20→import { getIdToken } from '@/lib/firebase-auth'
+    21→import { fmtDate, fmtRelative, taskColor, taskLabel, priorityColor, daysUntil, initials } from '@/lib/format'
+    22→import { toast } from 'sonner'
+    23→import type { TaskT, EmployeeT, SubmissionRequirement, SubmissionRequirementType, SubmissionFile, TaskSubmissionT } from '@/lib/types'
+    24→import {
+    25→  ListChecks, Plus, Clock, AlertCircle, CheckCircle2, Bot, FileText,
+    26→  Calendar, User, Sparkles, Loader2, ArrowLeft, Send, Award, Star, Save,
+    27→  Upload, File as FileIcon, Image as ImageIcon, Link as LinkIcon, Code2,
+    28→  Github, Trash2, X, RefreshCw, MessageSquare, XCircle,
+    29→} from 'lucide-react'
+    30→
+    31→const COLUMNS = [
+    32→  { id: 'CREATED', label: 'To Do', color: 'bg-zinc-400' },
+    33→  { id: 'ASSIGNED', label: 'Assigned', color: 'bg-sky-500' },
+    34→  { id: 'IN_PROGRESS', label: 'In Progress', color: 'bg-blue-500' },
+    35→  { id: 'SUBMITTED', label: 'Submitted', color: 'bg-amber-500' },
+    36→  { id: 'UNDER_REVIEW', label: 'Under Review', color: 'bg-violet-500' },
+    37→  { id: 'APPROVED', label: 'Approved', color: 'bg-teal-500' },
+    38→  { id: 'COMPLETED', label: 'Completed', color: 'bg-emerald-500' },
+    39→]
+    40→
+    41→const REQ_TYPES: { value: SubmissionRequirementType; label: string; icon: any; hint: string }[] = [
+    42→  { value: 'TEXT', label: 'Short Text', icon: FileText, hint: 'Single-line text input' },
+    43→  { value: 'LONG_TEXT', label: 'Long Text', icon: FileText, hint: 'Multi-line textarea (e.g., explanation)' },
+    44→  { value: 'CODE', label: 'Code', icon: Code2, hint: 'Code editor with syntax hint' },
+    45→  { value: 'GITHUB_URL', label: 'GitHub URL', icon: Github, hint: 'https://github.com/user/repo' },
+    46→  { value: 'URL', label: 'URL', icon: LinkIcon, hint: 'Any web URL (demo, doc, etc.)' },
+    47→  { value: 'IMAGE', label: 'Image', icon: ImageIcon, hint: 'Single image upload (PNG, JPG)' },
+    48→  { value: 'FILE', label: 'File', icon: FileIcon, hint: 'Single file upload (PDF, ZIP, etc.)' },
+    49→  { value: 'MULTIPLE_FILES', label: 'Multiple Files', icon: Upload, hint: 'Up to N files' },
+    50→]
+    51→
+    52→export function TasksView() {
+    53→  const { currentEmployee, selectedTaskId, setSelectedTaskId, bumpDataVersion, dataVersion } = useApp()
+    54→  const [tasks, setTasks] = useState<TaskT[]>([])
+    55→  const [reportees, setReportees] = useState<EmployeeT[]>([])
+    56→  const [loading, setLoading] = useState(true)
+    57→  const [createOpen, setCreateOpen] = useState(false)
+    58→
+    59→  const load = useCallback(async () => {
+    60→    if (!currentEmployee) return
+    61→    // Server derives user from token; default returns manager's created tasks or employee's assigned tasks
+    62→    const url = `/api/tasks`
+    63→    const t = await authedFetch(url).then((r) => r.json()).catch(() => [])
+    64→    setTasks(Array.isArray(t) ? t : [])
+    65→    const isManager = ['MANAGER', 'HR', 'ADMIN'].includes(currentEmployee.role)
+    66→    if (isManager) {
+    67→      const r = await authedFetch(`/api/employees?managerId=me`).then((r) => r.json()).catch(() => [])
+    68→      setReportees(Array.isArray(r) ? r : [])
+    69→    }
+    70→    setLoading(false)
+    71→  }, [currentEmployee])
+    72→
+    73→  useEffect(() => { load() }, [currentEmployee?.id, dataVersion])
+    74→
+    75→  async function handleStatusChange(taskId: string, newStatus: string) {
+    76→    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: newStatus } : t))
+    77→    const actionMap: Record<string, string> = {
+    78→      CREATED: 'START', ASSIGNED: 'START', IN_PROGRESS: 'START',
+    79→      SUBMITTED: 'SUBMIT', UNDER_REVIEW: 'SUBMIT',
+    80→      APPROVED: 'APPROVE', COMPLETED: 'COMPLETE',
+    81→    }
+    82→    try {
+    83→      const action = actionMap[newStatus] || 'START'
+    84→      const res = await authedFetch(`/api/tasks/${taskId}`, {
+    85→        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    86→        body: JSON.stringify({ action }),
+    87→      })
+    88→      if (!res.ok) throw new Error()
+    89→      toast.success(`Task moved to ${newStatus.replace(/_/g, ' ').toLowerCase()}`)
+    90→    } catch {
+    91→      toast.error('Failed to update status')
+    92→      load()
+    93→    }
+    94→  }
+    95→
+    96→  if (selectedTaskId) return <TaskDetail taskId={selectedTaskId} onBack={() => setSelectedTaskId(null)} onChange={load} />
+    97→
+    98→  return (
+    99→    <div className="space-y-6">
+   100→      <PageHeader
+   101→        title="My Tasks"
+   102→        description={currentEmployee && ['MANAGER', 'HR', 'ADMIN'].includes(currentEmployee.role) ? "Manage your team's work & assignments" : 'Track your assignments, deadlines and submissions'}
+   103→        actions={
+   104→          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+   105→            <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> New Task</Button></DialogTrigger>
+   106→            <CreateTaskDialog reportees={reportees} onClose={() => setCreateOpen(false)} onCreated={() => { load(); bumpDataVersion() }} />
+   107→          </Dialog>
+   108→        }
+   109→      />
+   110→
+   111→      <div className="animate-rise">
+   112→        <MetricStrip
+   113→          metrics={[
+   114→            { label: 'Pending', value: tasks.filter((t) => ['CREATED', 'ASSIGNED'].includes(t.status)).length, tone: 'default', sub: 'awaiting start' },
+   115→            { label: 'In Progress', value: tasks.filter((t) => t.status === 'IN_PROGRESS').length, tone: 'info', sub: 'active work' },
+   116→            { label: 'Overdue', value: tasks.filter((t) => t.deadline && (daysUntil(t.deadline) ?? 1) < 0 && !['COMPLETED', 'APPROVED'].includes(t.status)).length, tone: 'danger', sub: 'past deadline' },
+   117→            { label: 'Completed', value: tasks.filter((t) => t.status === 'COMPLETED' || t.status === 'APPROVED').length, tone: 'success', sub: 'this cycle' },
+   118→          ]}
+   119→        />
+   120→      </div>
+   121→
+   122→      <div className="animate-rise animate-rise-delay-1">
+   123→        <TaskCompletionTrend />
+   124→      </div>
+   125→
+   126→      <Tabs defaultValue="board" className="animate-rise animate-rise-delay-2">
+   127→        <TabsList>
+   128→          <TabsTrigger value="board">Board</TabsTrigger>
+   129→          <TabsTrigger value="list">List</TabsTrigger>
+   130→        </TabsList>
+   131→
+   132→        <TabsContent value="board">
+   133→          {loading ? (
+   134→            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+   135→              {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-48 rounded-lg surface-sunken animate-skeleton" />)}
+   136→            </div>
+   137→          ) : tasks.length === 0 ? (
+   138→            <Card><EmptyState icon={ListChecks} title="No tasks yet" description="Tasks assigned to you will appear here." /></Card>
+   139→          ) : (
+   140→            <KanbanBoard tasks={tasks} onTaskClick={(id) => setSelectedTaskId(id)} onStatusChange={handleStatusChange} />
+   141→          )}
+   142→        </TabsContent>
+   143→
+   144→        <TabsContent value="list">
+   145→          {loading ? (
+   146→            <Card className="p-2"><RowSkeleton count={6} /></Card>
+   147→          ) : tasks.length === 0 ? (
+   148→            <Card><EmptyState icon={ListChecks} title="No tasks" description="Once tasks are created, they will appear here." /></Card>
+   149→          ) : (
+   150→            <Card className="p-2 divide-y divide-border/60">
+   151→              {tasks.map((t) => <TaskCard key={t.id} task={t} onClick={() => setSelectedTaskId(t.id)} list />)}
+   152→            </Card>
+   153→          )}
+   154→        </TabsContent>
+   155→      </Tabs>
+   156→    </div>
+   157→  )
+   158→}
+   159→
+   160→function TaskCard({ task, onClick, list }: { task: TaskT; onClick?: () => void; list?: boolean }) {
+   161→  const d = task.deadline ? daysUntil(task.deadline) : null
+   162→  const overdue = d !== null && d < 0 && !['COMPLETED', 'APPROVED'].includes(task.status)
+   163→  const statusTone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' =
+   164→    task.status === 'COMPLETED' || task.status === 'APPROVED' ? 'success' :
+   165→    task.status === 'IN_PROGRESS' ? 'info' :
+   166→    task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW' ? 'warning' :
+   167→    'neutral'
+   168→  if (list) {
+   169→    return (
+   170→      <CompactRow
+   171→        onClick={onClick}
+   172→        leading={
+   173→          <div className="h-8 w-8 rounded-lg bg-muted/50 grid place-items-center shrink-0">
+   174→            <StatusDot tone={statusTone} />
+   175→          </div>
+   176→        }
+   177→        title={
+   178→          <span className="flex items-center gap-2 min-w-0">
+   179→            <span className="truncate">{task.title}</span>
+   180→            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 shrink-0 ${priorityColor(task.priority)}`}>{task.priority}</Badge>
+   181→          </span>
+   182→        }
+   183→        subtitle={
+   184→          <span className="flex items-center gap-1.5 truncate">
+   185→            {task.project && <span className="truncate">{task.project.name}</span>}
+   186→            {task.assignee && <span className="truncate">· {task.assignee.name.split(' ')[0]}</span>}
+   187→          </span>
+   188→        }
+   189→        trailing={
+   190→          <div className="flex items-center gap-1.5 justify-end">
+   191→            {task.deadline && (
+   192→              <Badge variant="outline" className={`text-[10px] tabular-nums ${overdue ? 'bg-rose-500/15 text-rose-600 border-rose-500/20' : (d !== null && d <= 3) ? 'bg-amber-500/15 text-amber-600 border-amber-500/20' : ''}`}>
+   193→                <Calendar className="h-2.5 w-2.5 mr-1" />{overdue ? 'Overdue' : d === 0 ? 'Today' : d !== null ? `${d}d` : ''}
+   194→              </Badge>
+   195→            )}
+   196→            <Badge variant="outline" className={`text-[10px] ${taskColor(task.status)}`}>{taskLabel(task.status)}</Badge>
+   197→          </div>
+   198→        }
+   199→      />
+   200→    )
+   201→  }
+   202→  return (
+   203→    <button onClick={onClick} className="w-full text-left rounded-lg border border-border bg-card p-3 hover:shadow-card hover:border-primary/30 transition-all duration-200 group">
+   204→      <div>
+   205→        <div className="flex items-start justify-between gap-2 mb-1.5">
+   206→          <p className="text-sm font-medium leading-snug group-hover:text-primary transition-colors">{task.title}</p>
+   207→          <Badge variant="outline" className={`text-[10px] shrink-0 ${priorityColor(task.priority)}`}>{task.priority}</Badge>
+   208→        </div>
+   209→        {task.description && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{task.description}</p>}
+   210→        {task.project && <Badge variant="secondary" className="text-[10px] mb-2">{task.project.name}</Badge>}
+   211→        <div className="flex items-center justify-between gap-2 mt-2">
+   212→          <div className="flex items-center gap-2 min-w-0">
+   213→            {task.assignee && (
+   214→              <div className="flex items-center gap-1.5 min-w-0">
+   215→                <Avatar className="h-5 w-5"><AvatarImage src={task.assignee.photoUrl} /><AvatarFallback className="text-[8px]">{initials(task.assignee.name)}</AvatarFallback></Avatar>
+   216→                <span className="text-[11px] text-muted-foreground truncate">{task.assignee.name.split(' ')[0]}</span>
+   217→              </div>
+   218→            )}
+   219→          </div>
+   220→          <div className="flex items-center gap-1.5 shrink-0">
+   221→            {task.deadline && (
+   222→              <Badge variant="outline" className={`text-[10px] tabular-nums ${overdue ? 'bg-rose-500/15 text-rose-600 border-rose-500/20' : (d !== null && d <= 3) ? 'bg-amber-500/15 text-amber-600 border-amber-500/20' : ''}`}>
+   223→                <Calendar className="h-2.5 w-2.5 mr-1" />{overdue ? 'Overdue' : d === 0 ? 'Today' : d !== null ? `${d}d` : ''}
+   224→              </Badge>
+   225→            )}
+   226→            <Badge variant="outline" className={`text-[10px] ${taskColor(task.status)}`}>{taskLabel(task.status)}</Badge>
+   227→          </div>
+   228→        </div>
+   229→      </div>
+   230→    </button>
+   231→  )
+   232→}
+   233→
+   234→// ============================================================
+   235→// CreateTaskDialog — with submission requirements builder
+   236→// ============================================================
+   237→function CreateTaskDialog({ reportees, onClose, onCreated }: { reportees: EmployeeT[]; onClose: () => void; onCreated: () => void }) {
+   238→  const { currentEmployee } = useApp()
+   239→  const [title, setTitle] = useState('')
+   240→  const [description, setDescription] = useState('')
+   241→  const [assigneeId, setAssigneeId] = useState('') // Firebase UID
+   242→  const [priority, setPriority] = useState('MEDIUM')
+   243→  const [deadline, setDeadline] = useState('')
+   244→  const [expectedDeliverable, setExpectedDeliverable] = useState('')
+   245→  const [evaluationCriteria, setEvaluationCriteria] = useState('')
+   246→  const [requirements, setRequirements] = useState<SubmissionRequirement[]>([
+   247→    { id: `req_${Math.random().toString(36).slice(2, 10)}`, type: 'LONG_TEXT', label: 'Explanation', helpText: 'Describe your approach and any notes for the reviewer', required: true },
+   248→  ])
+   249→  const [submitting, setSubmitting] = useState(false)
+   250→
+   251→  function addRequirement() {
+   252→    setRequirements([...requirements, {
+   253→      id: `req_${Math.random().toString(36).slice(2, 10)}`,
+   254→      type: 'TEXT', label: '', helpText: '', required: false,
+   255→    }])
+   256→  }
+   257→  function updateReq(id: string, patch: Partial<SubmissionRequirement>) {
+   258→    setRequirements(requirements.map(r => r.id === id ? { ...r, ...patch } : r))
+   259→  }
+   260→  function removeReq(id: string) {
+   261→    setRequirements(requirements.filter(r => r.id !== id))
+   262→  }
+   263→
+   264→  async function create() {
+   265→    if (!currentEmployee || !title) { toast.error('Title required'); return }
+   266→    if (!assigneeId) { toast.error('Please select an assignee'); return }
+   267→    setSubmitting(true)
+   268→    try {
+   269→      // Filter out requirements without labels
+   270→      const cleanReqs = requirements.filter(r => r.label.trim()).map(r => ({
+   271→        ...r,
+   272→        label: r.label.trim(),
+   273→        helpText: (r.helpText || '').trim(),
+   274→      }))
+   275→      const res = await authedFetch('/api/tasks', {
+   276→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   277→        body: JSON.stringify({
+   278→          title, description,
+   279→          assigneeId, // Firebase UID — server also verifies
+   280→          priority,
+   281→          deadline: deadline || undefined,
+   282→          expectedDeliverable,
+   283→          evaluationCriteria,
+   284→          submissionRequirements: cleanReqs,
+   285→        }),
+   286→      })
+   287→      if (!res.ok) {
+   288→        const e = await res.json().catch(() => ({}))
+   289→        throw new Error(e.error || 'Failed')
+   290→      }
+   291→      toast.success('Task created & assigned — assignee will be notified')
+   292→      onClose(); onCreated()
+   293→    } catch (e: any) { toast.error(e.message || 'Failed') } finally { setSubmitting(false) }
+   294→  }
+   295→
+   296→  return (
+   297→    <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
+   298→      <DialogHeader><DialogTitle>Create New Task</DialogTitle></DialogHeader>
+   299→      <div className="space-y-4 py-2">
+   300→        <div className="space-y-1.5">
+   301→          <Label>Task Title</Label>
+   302→          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Build login API" />
+   303→        </div>
+   304→        <div className="space-y-1.5">
+   305→          <Label>Description</Label>
+   306→          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Detailed requirements, scope, acceptance criteria…" />
+   307→        </div>
+   308→        <div className="grid grid-cols-2 gap-3">
+   309→          <div className="space-y-1.5">
+   310→            <Label>Assign To</Label>
+   311→            <Select value={assigneeId} onValueChange={setAssigneeId}>
+   312→              <SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger>
+   313→              <SelectContent>
+   314→                {reportees.map((r) => <SelectItem key={r.uid || r.id} value={r.uid || r.id}>{r.name} · {r.designation}</SelectItem>)}
+   315→              </SelectContent>
+   316→            </Select>
+   317→          </div>
+   318→          <div className="space-y-1.5">
+   319→            <Label>Priority</Label>
+   320→            <Select value={priority} onValueChange={setPriority}>
+   321→              <SelectTrigger><SelectValue /></SelectTrigger>
+   322→              <SelectContent>
+   323→                <SelectItem value="LOW">Low</SelectItem>
+   324→                <SelectItem value="MEDIUM">Medium</SelectItem>
+   325→                <SelectItem value="HIGH">High</SelectItem>
+   326→                <SelectItem value="CRITICAL">Critical</SelectItem>
+   327→              </SelectContent>
+   328→            </Select>
+   329→          </div>
+   330→        </div>
+   331→        <div className="grid grid-cols-2 gap-3">
+   332→          <div className="space-y-1.5">
+   333→            <Label>Deadline</Label>
+   334→            <Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+   335→          </div>
+   336→          <div className="space-y-1.5">
+   337→            <Label>Expected Deliverable</Label>
+   338→            <Input value={expectedDeliverable} onChange={(e) => setExpectedDeliverable(e.target.value)} placeholder="What should be delivered" />
+   339→          </div>
+   340→        </div>
+   341→        <div className="space-y-1.5">
+   342→          <Label>Evaluation Criteria (optional)</Label>
+   343→          <Textarea value={evaluationCriteria} onChange={(e) => setEvaluationCriteria(e.target.value)} rows={2} placeholder="How will the submission be evaluated?" />
+   344→        </div>
+   345→
+   346→        {/* Submission Requirements Builder */}
+   347→        <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
+   348→          <div className="flex items-center justify-between">
+   349→            <div>
+   350→              <p className="text-sm font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Submission Requirements</p>
+   351→              <p className="text-xs text-muted-foreground">Define what the assignee must turn in. Like a Google Form.</p>
+   352→            </div>
+   353→            <Button type="button" variant="outline" size="sm" onClick={addRequirement} className="gap-1.5">
+   354→              <Plus className="h-3.5 w-3.5" /> Add Field
+   355→            </Button>
+   356→          </div>
+   357→          <div className="space-y-2">
+   358→            {requirements.map((r, idx) => {
+   359→              const typeCfg = REQ_TYPES.find(t => t.value === r.type)!
+   360→              const Icon = typeCfg.icon
+   361→              return (
+   362→                <div key={r.id} className="rounded-lg border border-border bg-card p-3 space-y-2">
+   363→                  <div className="flex items-center justify-between gap-2">
+   364→                    <span className="text-xs text-muted-foreground">Field #{idx + 1}</span>
+   365→                    <button type="button" onClick={() => removeReq(r.id)} className="text-muted-foreground hover:text-rose-600 transition-colors">
+   366→                      <Trash2 className="h-3.5 w-3.5" />
+   367→                    </button>
+   368→                  </div>
+   369→                  <div className="grid grid-cols-12 gap-2">
+   370→                    <div className="col-span-5">
+   371→                      <Label className="text-[10px]">Label</Label>
+   372→                      <Input value={r.label} onChange={(e) => updateReq(r.id, { label: e.target.value })} placeholder="e.g. GitHub Repo URL" className="text-sm h-8" />
+   373→                    </div>
+   374→                    <div className="col-span-5">
+   375→                      <Label className="text-[10px]">Type</Label>
+   376→                      <Select value={r.type} onValueChange={(v) => updateReq(r.id, { type: v as SubmissionRequirementType })}>
+   377→                        <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+   378→                        <SelectContent>
+   379→                          {REQ_TYPES.map((t) => (
+   380→                            <SelectItem key={t.value} value={t.value}>
+   381→                              <div className="flex items-center gap-2">
+   382→                                <t.icon className="h-3.5 w-3.5" />
+   383→                                <span>{t.label}</span>
+   384→                              </div>
+   385→                            </SelectItem>
+   386→                          ))}
+   387→                        </SelectContent>
+   388→                      </Select>
+   389→                    </div>
+   390→                    <div className="col-span-2 flex items-end gap-2 pb-0.5">
+   391→                      <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+   392→                        <input
+   393→                          type="checkbox"
+   394→                          checked={r.required}
+   395→                          onChange={(e) => updateReq(r.id, { required: e.target.checked })}
+   396→                          className="rounded border-border"
+   397→                        />
+   398→                        <span>Required</span>
+   399→                      </label>
+   400→                    </div>
+   401→                  </div>
+   402→                  <Input
+   403→                    value={r.helpText || ''}
+   404→                    onChange={(e) => updateReq(r.id, { helpText: e.target.value })}
+   405→                    placeholder={`Help text — ${typeCfg.hint}`}
+   406→                    className="text-xs h-8"
+   407→                  />
+   408→                  {['IMAGE', 'FILE', 'MULTIPLE_FILES'].includes(r.type) && (
+   409→                    <div className="grid grid-cols-2 gap-2">
+   410→                      <div>
+   411→                        <Label className="text-[10px]">Max files</Label>
+   412→                        <Input
+   413→                          type="number"
+   414→                          value={r.maxFiles || (r.type === 'MULTIPLE_FILES' ? 5 : 1)}
+   415→                          onChange={(e) => updateReq(r.id, { maxFiles: parseInt(e.target.value) || 1 })}
+   416→                          className="text-sm h-8"
+   417→                          min={1}
+   418→                          max={20}
+   419→                        />
+   420→                      </div>
+   421→                      <div>
+   422→                        <Label className="text-[10px]">Accepted types (comma-sep)</Label>
+   423→                        <Input
+   424→                          value={(r.acceptedTypes || []).join(',')}
+   425→                          onChange={(e) => updateReq(r.id, { acceptedTypes: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+   426→                          placeholder="image/png, application/pdf"
+   427→                          className="text-sm h-8"
+   428→                        />
+   429→                      </div>
+   430→                    </div>
+   431→                  )}
+   432→                  {['TEXT', 'LONG_TEXT', 'CODE'].includes(r.type) && (
+   433→                    <div>
+   434→                      <Label className="text-[10px]">Max length (chars, optional)</Label>
+   435→                      <Input
+   436→                        type="number"
+   437→                        value={r.maxLength || ''}
+   438→                        onChange={(e) => updateReq(r.id, { maxLength: parseInt(e.target.value) || undefined })}
+   439→                        placeholder="e.g. 5000"
+   440→                        className="text-sm h-8"
+   441→                      />
+   442→                    </div>
+   443→                  )}
+   444→                </div>
+   445→              )
+   446→            })}
+   447→          </div>
+   448→        </div>
+   449→      </div>
+   450→      <DialogFooter>
+   451→        <Button variant="outline" onClick={onClose}>Cancel</Button>
+   452→        <Button onClick={create} disabled={submitting} className="gap-2">
+   453→          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+   454→          Create & Assign
+   455→        </Button>
+   456→      </DialogFooter>
+   457→    </DialogContent>
+   458→  )
+   459→}
+   460→
+   461→// ============================================================
+   462→// TaskDetail — full task view + submission workspace
+   463→// ============================================================
+   464→function TaskDetail({ taskId, onBack, onChange }: { taskId: string; onBack: () => void; onChange: () => void }) {
+   465→  const { currentEmployee, bumpDataVersion } = useApp()
+   466→  const [task, setTask] = useState<TaskT | null>(null)
+   467→  const [loading, setLoading] = useState(true)
+   468→  const [submissionNote, setSubmissionNote] = useState('')
+   469→  const [managerScore, setManagerScore] = useState(80)
+   470→  const [managerFeedback, setManagerFeedback] = useState('')
+   471→  const [aiLoading, setAiLoading] = useState(false)
+   472→  const [celebrate, setCelebrate] = useState(0)
+   473→  const [celebrateMsg, setCelebrateMsg] = useState('')
+   474→  const [acting, setActing] = useState(false)
+   475→  // Submission workspace state
+   476→  const [submissions, setSubmissions] = useState<TaskSubmissionT[]>([])
+   477→  // Per-requirement field values: { [reqId]: { value: string, files: SubmissionFile[] } }
+   478→  const [fieldValues, setFieldValues] = useState<Record<string, { value: string; files: SubmissionFile[] }>>({})
+   479→  const [draftSaved, setDraftSaved] = useState<string | null>(null)
+   480→  const [submittingSub, setSubmittingSub] = useState(false)
+   481→  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
+   482→  const [uploadingReqId, setUploadingReqId] = useState<string | null>(null)
+   483→  const [showChangesDialog, setShowChangesDialog] = useState(false)
+   484→
+   485→  const load = useCallback(async () => {
+   486→    setLoading(true)
+   487→    try {
+   488→      const t = await authedFetch(`/api/tasks/${taskId}`).then((r) => r.json())
+   489→      setTask(t)
+   490→      setSubmissionNote(t.submissionNote || '')
+   491→      setManagerScore(t.managerScore || 80)
+   492→      setManagerFeedback(t.managerFeedback || '')
+   493→      const subs = await authedFetch(`/api/submissions?taskId=${taskId}`).then((r) => r.json()).catch(() => [])
+   494→      setSubmissions(Array.isArray(subs) ? subs : [])
+   495→      // Restore draft
+   496→      const latestDraft = (Array.isArray(subs) ? subs : []).find((s: any) => s.status === 'DRAFT')
+   497→      if (latestDraft) {
+   498→        setSubmissionNote(latestDraft.submissionNote || '')
+   499→        // Restore per-requirement fields
+   500→        const restored: Record<string, { value: string; files: SubmissionFile[] }> = {}
+   501→        if (Array.isArray(latestDraft.fields)) {
+   502→          for (const f of latestDraft.fields) {
+   503→            restored[f.requirementId] = { value: f.value || '', files: Array.isArray(f.files) ? f.files : [] }
+   504→          }
+   505→        }
+   506→        setFieldValues(restored)
+   507→        setDraftSaved(latestDraft.updatedAt)
+   508→      } else {
+   509→        // Initialize empty field values for all requirements
+   510→        const init: Record<string, { value: string; files: SubmissionFile[] }> = {}
+   511→        if (Array.isArray(t.submissionRequirements)) {
+   512→          for (const r of t.submissionRequirements) {
+   513→            init[r.id] = { value: '', files: [] }
+   514→          }
+   515→        }
+   516→        setFieldValues(init)
+   517→      }
+   518→    } catch (e) {
+   519→      console.error('TaskDetail load error:', e)
+   520→    } finally {
+   521→      setLoading(false)
+   522→    }
+   523→  }, [taskId])
+   524→  useEffect(() => { load() }, [taskId])
+   525→
+   526→  async function act(action: string, extra?: any) {
+   527→    setActing(true)
+   528→    try {
+   529→      const res = await authedFetch(`/api/tasks/${taskId}`, {
+   530→        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+   531→        body: JSON.stringify({ action, ...extra }),
+   532→      })
+   533→      if (!res.ok) {
+   534→        const e = await res.json().catch(() => ({}))
+   535→        throw new Error(e.error || 'Failed')
+   536→      }
+   537→      if (action === 'COMPLETE') {
+   538→        setCelebrateMsg('Task Completed! ✅'); setCelebrate((c) => c + 1)
+   539→        toast.success('🎉 Task completed! Great work!')
+   540→      } else if (action === 'APPROVE') {
+   541→        setCelebrateMsg('Task Approved! ⭐'); setCelebrate((c) => c + 1)
+   542→        toast.success('🎉 Task approved!')
+   543→      } else if (action === 'CHANGES_REQUESTED') {
+   544→        toast.success('Changes requested — assignee has been notified')
+   545→        setShowChangesDialog(false)
+   546→      } else {
+   547→        toast.success('Task updated')
+   548→      }
+   549→      load(); onChange(); bumpDataVersion()
+   550→    } catch (e: any) { toast.error(e.message || 'Failed') } finally { setActing(false) }
+   551→  }
+   552→
+   553→  async function runAIEval() {
+   554→    setAiLoading(true)
+   555→    try {
+   556→      const res = await authedFetch('/api/ai/evaluate', {
+   557→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   558→        body: JSON.stringify({ taskId }),
+   559→      })
+   560→      if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
+   561→      toast.success('AI evaluation complete')
+   562→      load(); onChange()
+   563→    } catch (e: any) { toast.error(e.message || 'AI failed') } finally { setAiLoading(false) }
+   564→  }
+   565→
+   566→  // Upload a file to Supabase via /api/storage/upload
+   567→  async function uploadFile(reqId: string, file: File) {
+   568→    if (!currentEmployee) return
+   569→    setUploadingReqId(reqId)
+   570→    try {
+   571→      const draftId = submissions.find((s: any) => s.status === 'DRAFT')?.id || 'draft'
+   572→      const path = `task-submissions/${currentEmployee.id}/${taskId}/${draftId}`
+   573→      const formData = new FormData()
+   574→      formData.append('file', file)
+   575→      formData.append('path', path)
+   576→      formData.append('context', 'task_submission')
+   577→      formData.append('taskId', taskId)
+   578→
+   579→      const res = await authedFetch('/api/storage/upload', {
+   580→        method: 'POST',
+   581→        body: formData,
+   582→      })
+   583→      if (!res.ok) {
+   584→        const e = await res.json().catch(() => ({}))
+   585→        throw new Error(e.error || 'Upload failed')
+   586→      }
+   587→      const result = await res.json()
+   588→      const fileMeta: SubmissionFile = {
+   589→        name: result.fileName,
+   590→        path: result.path,
+   591→        mimeType: result.mimeType,
+   592→        size: result.size,
+   593→        uploadedBy: currentEmployee.id,
+   594→        uploadedAt: result.uploadedAt || new Date().toISOString(),
+   595→        requirementId: reqId,
+   596→      }
+   597→      setFieldValues(prev => ({
+   598→        ...prev,
+   599→        [reqId]: {
+   600→          value: prev[reqId]?.value || '',
+   601→          files: [...(prev[reqId]?.files || []), fileMeta],
+   602→        },
+   603→      }))
+   604→      toast.success(`Uploaded ${result.fileName}`)
+   605→    } catch (e: any) {
+   606→      toast.error(`Upload failed: ${e.message}`)
+   607→    } finally {
+   608→      setUploadingReqId(null)
+   609→    }
+   610→  }
+   611→
+   612→  function removeFile(reqId: string, idx: number) {
+   613→    setFieldValues(prev => ({
+   614→      ...prev,
+   615→      [reqId]: {
+   616→        ...prev[reqId],
+   617→        files: (prev[reqId]?.files || []).filter((_, i) => i !== idx),
+   618→      },
+   619→    }))
+   620→  }
+   621→
+   622→  // Download a file (manager or assignee)
+   623→  async function downloadFile(filePath: string) {
+   624→    try {
+   625→      const res = await authedFetch('/api/storage/download', {
+   626→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   627→        body: JSON.stringify({ path: filePath, taskId }),
+   628→      })
+   629→      if (!res.ok) {
+   630→        const e = await res.json().catch(() => ({}))
+   631→        throw new Error(e.error || 'Download failed')
+   632→      }
+   633→      const { url } = await res.json()
+   634→      window.open(url, '_blank', 'noopener,noreferrer')
+   635→    } catch (e: any) {
+   636→      toast.error(`Download failed: ${e.message}`)
+   637→    }
+   638→  }
+   639→
+   640→  // Build the submission payload (used by both saveDraft and submitFinal)
+   641→  function buildSubmissionPayload(status: 'DRAFT' | 'SUBMITTED') {
+   642→    const fields = Object.entries(fieldValues).map(([reqId, fv]) => ({
+   643→      requirementId: reqId,
+   644→      value: fv.value,
+   645→      files: fv.files,
+   646→    }))
+   647→    // Flatten files + links for backward compat
+   648→    const allFiles: SubmissionFile[] = []
+   649→    const allLinks: { url: string; label?: string; requirementId?: string }[] = []
+   650→    if (task?.submissionRequirements) {
+   651→      for (const req of task.submissionRequirements) {
+   652→        const fv = fieldValues[req.id]
+   653→        if (!fv) continue
+   654→        if (['IMAGE', 'FILE', 'MULTIPLE_FILES'].includes(req.type)) {
+   655→          for (const f of fv.files) allFiles.push({ ...f, requirementId: req.id })
+   656→        }
+   657→        if (['URL', 'GITHUB_URL'].includes(req.type) && fv.value) {
+   658→          allLinks.push({ url: fv.value, label: req.label, requirementId: req.id })
+   659→        }
+   660→      }
+   661→    }
+   662→    return { taskId, submissionNote, fields, files: allFiles, links: allLinks, status }
+   663→  }
+   664→
+   665→  // Validate required fields before submission
+   666→  function validateSubmission(): { ok: boolean; missing: SubmissionRequirement[] } {
+   667→    if (!task?.submissionRequirements) return { ok: true, missing: [] }
+   668→    const missing: SubmissionRequirement[] = []
+   669→    for (const req of task.submissionRequirements) {
+   670→      if (!req.required) continue
+   671→      const fv = fieldValues[req.id]
+   672→      if (!fv) { missing.push(req); continue }
+   673→      if (['TEXT', 'LONG_TEXT', 'CODE', 'URL', 'GITHUB_URL'].includes(req.type)) {
+   674→        if (!fv.value.trim()) missing.push(req)
+   675→      }
+   676→      if (['IMAGE', 'FILE', 'MULTIPLE_FILES'].includes(req.type)) {
+   677→        if (fv.files.length === 0) missing.push(req)
+   678→      }
+   679→    }
+   680→    return { ok: missing.length === 0, missing }
+   681→  }
+   682→
+   683→  async function saveDraft() {
+   684→    if (!currentEmployee) return
+   685→    setSubmittingSub(true)
+   686→    try {
+   687→      const existingDraft = submissions.find((s: any) => s.status === 'DRAFT')
+   688→      const payload = buildSubmissionPayload('DRAFT')
+   689→      if (existingDraft) {
+   690→        await authedFetch('/api/submissions', {
+   691→          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+   692→          body: JSON.stringify({ id: existingDraft.id, ...payload }),
+   693→        })
+   694→      } else {
+   695→        await authedFetch('/api/submissions', {
+   696→          method: 'POST', headers: { 'Content-Type': 'application/json' },
+   697→          body: JSON.stringify(payload),
+   698→        })
+   699→      }
+   700→      setDraftSaved(new Date().toISOString())
+   701→      toast.success('Draft saved')
+   702→      load()
+   703→    } catch { toast.error('Failed to save draft') } finally { setSubmittingSub(false) }
+   704→  }
+   705→
+   706→  async function submitFinal() {
+   707→    if (!currentEmployee) return
+   708→    // Validate
+   709→    const { ok, missing } = validateSubmission()
+   710→    if (!ok) {
+   711→      toast.error(`Missing required fields: ${missing.map(m => m.label).join(', ')}`)
+   712→      setShowSubmitConfirm(false)
+   713→      return
+   714→    }
+   715→    setSubmittingSub(true)
+   716→    try {
+   717→      const payload = buildSubmissionPayload('SUBMITTED')
+   718→      // If there's an existing draft, PATCH it to SUBMITTED; otherwise POST a new one
+   719→      const existingDraft = submissions.find((s: any) => s.status === 'DRAFT')
+   720→      if (existingDraft) {
+   721→        await authedFetch('/api/submissions', {
+   722→          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+   723→          body: JSON.stringify({ id: existingDraft.id, ...payload }),
+   724→        })
+   725→      } else {
+   726→        await authedFetch('/api/submissions', {
+   727→          method: 'POST', headers: { 'Content-Type': 'application/json' },
+   728→          body: JSON.stringify(payload),
+   729→        })
+   730→      }
+   731→      toast.success('✓ Submission received! Your manager has been notified.')
+   732→      setShowSubmitConfirm(false)
+   733→      load(); onChange(); bumpDataVersion()
+   734→    } catch { toast.error('Submission failed') } finally { setSubmittingSub(false) }
+   735→  }
+   736→
+   737→  if (loading) return (
+   738→    <div className="space-y-4">
+   739→      <div className="h-9 w-36 rounded-md surface-sunken animate-skeleton" />
+   740→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+   741→        <div className="lg:col-span-2 space-y-4">
+   742→          <div className="h-40 rounded-lg surface-sunken animate-skeleton" />
+   743→          <RowSkeleton count={4} />
+   744→        </div>
+   745→        <div className="space-y-3">
+   746→          <div className="h-24 rounded-lg surface-sunken animate-skeleton" />
+   747→          <div className="h-48 rounded-lg surface-sunken animate-skeleton" />
+   748→        </div>
+   749→      </div>
+   750→    </div>
+   751→  )
+   752→  if (!task) return <EmptyState icon={AlertCircle} title="Task not found" action={<Button onClick={onBack} variant="outline"><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>} />
+   753→
+   754→  const isAssignee = currentEmployee?.id === task.assignedTo
+   755→  const isCreator = currentEmployee?.id === task.createdBy
+   756→  const isManagerRole = currentEmployee && ['MANAGER', 'HR', 'ADMIN'].includes(currentEmployee.role)
+   757→  const canSubmit = isAssignee && ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS', 'CREATED'].includes(task.status)
+   758→  const canEvaluate = (isCreator || isAssignee || isManagerRole) && (task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW')
+   759→  const canReview = (isCreator || isManagerRole) && (task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW')
+   760→  const d = task.deadline ? daysUntil(task.deadline) : null
+   761→  const overdue = d !== null && d < 0 && !['COMPLETED', 'APPROVED'].includes(task.status)
+   762→  const submissionTone: 'success' | 'warning' | 'danger' | 'info' | 'neutral' =
+   763→    task.status === 'COMPLETED' || task.status === 'APPROVED' ? 'success' :
+   764→    task.status === 'IN_PROGRESS' ? 'info' :
+   765→    task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW' ? 'warning' :
+   766→    task.managerStatus === 'CHANGES_REQUESTED' ? 'warning' :
+   767→    'neutral'
+   768→
+   769→  return (
+   770→    <div className="space-y-6">
+   771→      <CelebrationOverlay trigger={celebrate} message={celebrateMsg} />
+   772→      <Button variant="ghost" size="sm" onClick={onBack} className="gap-2 -ml-2 focus-ring"><ArrowLeft className="h-4 w-4" /> Back to tasks</Button>
+   773→
+   774→      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 animate-rise">
+   775→        <div className="flex-1 min-w-0">
+   776→          <div className="flex items-center gap-2 flex-wrap mb-3">
+   777→            <span className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1">
+   778→              <StatusDot tone={submissionTone} />
+   779→              <span className="text-[11px] font-medium">{taskLabel(task.status)}</span>
+   780→            </span>
+   781→            <Badge variant="outline" className={`text-[10px] ${priorityColor(task.priority)}`}>{task.priority}</Badge>
+   782→            {task.project && <Badge variant="secondary" className="text-[10px]">{task.project.name}</Badge>}
+   783→            {overdue && <Badge variant="outline" className="text-[10px] bg-rose-500/15 text-rose-600 border-rose-500/20">Overdue</Badge>}
+   784→            {task.managerStatus === 'CHANGES_REQUESTED' && (
+   785→              <Badge variant="outline" className="text-[10px] bg-amber-500/15 text-amber-600 border-amber-500/20">Changes Requested</Badge>
+   786→            )}
+   787→          </div>
+   788→          <h2 className="text-[22px] lg:text-[26px] font-bold tracking-tight leading-tight">{task.title}</h2>
+   789→          {task.description && <p className="text-[13px] text-muted-foreground mt-2 leading-relaxed max-w-3xl">{task.description}</p>}
+   790→        </div>
+   791→      </div>
+   792→
+   793→      <div className="animate-rise animate-rise-delay-1">
+   794→        <MetricStrip
+   795→          metrics={[
+   796→            { label: 'Assignee', value: task.assignee?.name || 'Unassigned', sub: task.assignee?.designation },
+   797→            { label: 'Deadline', value: task.deadline ? fmtDate(task.deadline, 'd MMM yyyy') : '—', sub: task.deadline ? fmtRelative(task.deadline) : undefined, tone: overdue ? 'danger' : 'default' },
+   798→            { label: 'Submitted', value: task.submittedAt ? fmtRelative(task.submittedAt) : '—', sub: task.submittedAt ? fmtDate(task.submittedAt, 'd MMM') : undefined },
+   799→            { label: 'Completed', value: task.completedAt ? fmtRelative(task.completedAt) : '—', sub: task.completedAt ? fmtDate(task.completedAt, 'd MMM') : undefined, tone: task.completedAt ? 'success' : 'default' },
+   800→          ]}
+   801→        />
+   802→      </div>
+   803→
+   804→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-rise animate-rise-delay-2">
+   805→        <div className="lg:col-span-2 space-y-6">
+   806→          {task.expectedDeliverable && (
+   807→            <Card className="p-5 shadow-card">
+   808→              <SectionLabel className="mb-2 flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-primary" /> Expected Deliverable</SectionLabel>
+   809→              <p className="text-[13px] text-foreground/80 leading-relaxed">{task.expectedDeliverable}</p>
+   810→              {task.evaluationCriteria && <div className="mt-3 pt-3 border-t border-border/60"><SectionLabel className="mb-1.5">Evaluation Criteria</SectionLabel><p className="text-[13px] text-muted-foreground leading-relaxed">{task.evaluationCriteria}</p></div>}
+   811→            </Card>
+   812→          )}
+   813→
+   814→          {/* Submission Workspace */}
+   815→          {canSubmit ? (
+   816→            <Card className="p-5 border-primary/30 bg-primary/5 shadow-card">
+   817→              <div className="flex items-center justify-between mb-4">
+   818→                <div>
+   819→                  <SectionLabel className="mb-1 flex items-center gap-2"><Send className="h-3.5 w-3.5 text-primary" /> Submission Workspace</SectionLabel>
+   820→                  <p className="text-[15px] font-semibold leading-tight">Complete & Turn In</p>
+   821→                </div>
+   822→                {draftSaved ? (
+   823→                  <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1">
+   824→                    <StatusDot tone="neutral" />
+   825→                    <span className="text-[10px] text-muted-foreground">Draft saved {fmtRelative(draftSaved)}</span>
+   826→                  </span>
+   827→                ) : (
+   828→                  <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1">
+   829→                    <StatusDot tone="info" />
+   830→                    <span className="text-[10px] text-muted-foreground">Draft</span>
+   831→                  </span>
+   832→                )}
+   833→              </div>
+   834→
+   835→              {/* Per-requirement fields */}
+   836→              {Array.isArray(task.submissionRequirements) && task.submissionRequirements.length > 0 ? (
+   837→                <div className="space-y-3">
+   838→                  {task.submissionRequirements.map((req, idx) => {
+   839→                    const typeCfg = REQ_TYPES.find(t => t.value === req.type)!
+   840→                    const Icon = typeCfg?.icon || FileText
+   841→                    const fv = fieldValues[req.id] || { value: '', files: [] }
+   842→                    const filled = (['TEXT', 'LONG_TEXT', 'CODE', 'URL', 'GITHUB_URL'].includes(req.type) && fv.value.trim().length > 0) || (['IMAGE', 'FILE', 'MULTIPLE_FILES'].includes(req.type) && fv.files.length > 0)
+   843→                    return (
+   844→                      <div key={req.id} className="rounded-lg border border-border bg-card p-3.5 space-y-2.5 hover:border-border/60 transition-colors">
+   845→                        <div className="flex items-start justify-between gap-2">
+   846→                          <div className="flex items-start gap-2.5 min-w-0">
+   847→                            <span className="text-[10px] font-mono font-semibold text-muted-foreground/70 mt-1 tabular-nums shrink-0">{String(idx + 1).padStart(2, '0')}</span>
+   848→                            <div className="min-w-0">
+   849→                              <div className="flex items-center gap-2">
+   850→                                <Icon className="h-3.5 w-3.5 text-primary shrink-0" />
+   851→                                <Label className="text-[13px] font-medium leading-tight">{req.label}{req.required && <span className="text-rose-600 ml-0.5">*</span>}</Label>
+   852→                              </div>
+   853→                              {req.helpText && <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{req.helpText}</p>}
+   854→                            </div>
+   855→                          </div>
+   856→                          <div className="flex items-center gap-1.5 shrink-0">
+   857→                            {filled && <StatusDot tone="success" />}
+   858→                            <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${req.required ? 'bg-rose-500/8 text-rose-600 border-rose-500/20' : 'bg-muted text-muted-foreground'}`}>{req.required ? 'Required' : 'Optional'}</Badge>
+   859→                            <Badge variant="outline" className="text-[9px] px-1.5 py-0">{typeCfg?.label || req.type}</Badge>
+   860→                          </div>
+   861→                        </div>
+   862→
+   863→                        {/* Render input by type */}
+   864→                        {req.type === 'TEXT' && (
+   865→                          <Input
+   866→                            value={fv.value}
+   867→                            onChange={(e) => setFieldValues(prev => ({ ...prev, [req.id]: { ...fv, value: e.target.value } }))}
+   868→                            placeholder="Enter your response…"
+   869→                            maxLength={req.maxLength}
+   870→                          />
+   871→                        )}
+   872→                        {req.type === 'LONG_TEXT' && (
+   873→                          <Textarea
+   874→                            value={fv.value}
+   875→                            onChange={(e) => setFieldValues(prev => ({ ...prev, [req.id]: { ...fv, value: e.target.value } }))}
+   876→                            placeholder="Enter your detailed response…"
+   877→                            rows={4}
+   878→                            maxLength={req.maxLength}
+   879→                          />
+   880→                        )}
+   881→                        {req.type === 'CODE' && (
+   882→                          <Textarea
+   883→                            value={fv.value}
+   884→                            onChange={(e) => setFieldValues(prev => ({ ...prev, [req.id]: { ...fv, value: e.target.value } }))}
+   885→                            placeholder="Paste your code here…"
+   886→                            rows={6}
+   887→                            className="font-mono text-xs"
+   888→                            maxLength={req.maxLength}
+   889→                          />
+   890→                        )}
+   891→                        {req.type === 'GITHUB_URL' && (
+   892→                          <div className="flex items-center gap-2">
+   893→                            <Github className="h-4 w-4 text-muted-foreground" />
+   894→                            <Input
+   895→                              value={fv.value}
+   896→                              onChange={(e) => setFieldValues(prev => ({ ...prev, [req.id]: { ...fv, value: e.target.value } }))}
+   897→                              placeholder="https://github.com/username/repository"
+   898→                              type="url"
+   899→                            />
+   900→                          </div>
+   901→                        )}
+   902→                        {req.type === 'URL' && (
+   903→                          <div className="flex items-center gap-2">
+   904→                            <LinkIcon className="h-4 w-4 text-muted-foreground" />
+   905→                            <Input
+   906→                              value={fv.value}
+   907→                              onChange={(e) => setFieldValues(prev => ({ ...prev, [req.id]: { ...fv, value: e.target.value } }))}
+   908→                              placeholder="https://"
+   909→                              type="url"
+   910→                            />
+   911→                          </div>
+   912→                        )}
+   913→                        {['IMAGE', 'FILE', 'MULTIPLE_FILES'].includes(req.type) && (
+   914→                          <div className="space-y-2">
+   915→                            <label className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border bg-muted/20 p-4 cursor-pointer hover:border-primary/40 hover:bg-muted/40 transition-all ${uploadingReqId === req.id ? 'opacity-50' : ''}`}>
+   916→                              <input
+   917→                                type="file"
+   918→                                className="hidden"
+   919→                                multiple={req.type === 'MULTIPLE_FILES'}
+   920→                                accept={req.acceptedTypes?.join(',') || (req.type === 'IMAGE' ? 'image/*' : undefined)}
+   921→                                onChange={(e) => {
+   922→                                  const files = Array.from(e.target.files || [])
+   923→                                  files.forEach(f => uploadFile(req.id, f))
+   924→                                  e.target.value = ''
+   925→                                }}
+   926→                                disabled={uploadingReqId === req.id || (req.type !== 'MULTIPLE_FILES' && fv.files.length >= 1) || (req.type === 'MULTIPLE_FILES' && fv.files.length >= (req.maxFiles || 5))}
+   927→                              />
+   928→                              {uploadingReqId === req.id ? (
+   929→                                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+   930→                              ) : (
+   931→                                <Upload className="h-5 w-5 text-muted-foreground" />
+   932→                              )}
+   933→                              <span className="text-xs text-muted-foreground">
+   934→                                {uploadingReqId === req.id ? 'Uploading…' : req.type === 'MULTIPLE_FILES' ? `Upload up to ${req.maxFiles || 5} files` : `Click to upload ${req.type === 'IMAGE' ? 'an image' : 'a file'}`}
+   935→                              </span>
+   936→                            </label>
+   937→                            {fv.files.length > 0 && (
+   938→                              <div className="space-y-1.5">
+   939→                                {fv.files.map((f, i) => (
+   940→                                  <div key={i} className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-1.5 text-xs hover:border-border/60 transition-colors">
+   941→                                    <FileIcon className="h-3.5 w-3.5 text-primary shrink-0" />
+   942→                                    <span className="flex-1 truncate">{f.name}</span>
+   943→                                    <span className="text-muted-foreground tabular-nums">{(f.size / 1024).toFixed(1)}KB</span>
+   944→                                    <button onClick={() => removeFile(req.id, i)} className="text-muted-foreground hover:text-rose-600 transition-colors">
+   945→                                      <X className="h-3.5 w-3.5" />
+   946→                                    </button>
+   947→                                  </div>
+   948→                                ))}
+   949→                              </div>
+   950→                            )}
+   951→                          </div>
+   952→                        )}
+   953→                      </div>
+   954→                    )
+   955→                  })}
+   956→
+   957→                  {/* Overall note */}
+   958→                  <div className="space-y-1.5 rounded-lg border border-dashed border-border/60 bg-muted/20 p-3">
+   959→                    <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Additional Notes (optional)</Label>
+   960→                    <Textarea
+   961→                      value={submissionNote}
+   962→                      onChange={(e) => setSubmissionNote(e.target.value)}
+   963→                      placeholder="Any extra context for the reviewer…"
+   964→                      rows={3}
+   965→                      className="bg-card border-0 focus-visible:ring-1 focus-visible:ring-primary/30"
+   966→                    />
+   967→                  </div>
+   968→                </div>
+   969→              ) : (
+   970→                <div className="space-y-3">
+   971→                  <div className="space-y-1.5">
+   972→                    <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Files (comma-separated filenames)</Label>
+   973→                    <Input value={fieldValues['_legacy_files']?.value || ''} onChange={(e) => setFieldValues(prev => ({ ...prev, _legacy_files: { value: e.target.value, files: [] } }))} placeholder="report.pdf, code.zip" className="text-sm h-9" />
+   974→                  </div>
+   975→                  <div className="space-y-1.5">
+   976→                    <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Links (comma-separated URLs)</Label>
+   977→                    <Input value={fieldValues['_legacy_links']?.value || ''} onChange={(e) => setFieldValues(prev => ({ ...prev, _legacy_links: { value: e.target.value, files: [] } }))} placeholder="https://github.com/user/repo" className="text-sm h-9" />
+   978→                  </div>
+   979→                  <div className="space-y-1.5">
+   980→                    <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Written Explanation</Label>
+   981→                    <Textarea value={submissionNote} onChange={(e) => setSubmissionNote(e.target.value)} placeholder="Describe your approach…" rows={4} />
+   982→                  </div>
+   983→                </div>
+   984→              )}
+   985→
+   986→              {/* Actions — clear visual hierarchy */}
+   987→              <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-border/60">
+   988→                {['ASSIGNED', 'ACCEPTED', 'CREATED'].includes(task.status) && (
+   989→                  <Button variant="outline" onClick={() => act('START')} disabled={acting}>Start Work</Button>
+   990→                )}
+   991→                <div className="flex items-center gap-2 ml-auto">
+   992→                  <Button variant="outline" onClick={saveDraft} disabled={submittingSub} className="gap-2">
+   993→                    {submittingSub ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Draft
+   994→                  </Button>
+   995→                  <Button onClick={() => setShowSubmitConfirm(true)} disabled={submittingSub} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-card">
+   996→                    <Send className="h-4 w-4" /> Turn In
+   997→                  </Button>
+   998→                </div>
+   999→              </div>
+  1000→
+  1001→              {/* Submit confirmation */}
+  1002→              {showSubmitConfirm && (
+  1003→                <div className="mt-4 rounded-lg border border-primary/40 bg-card shadow-card-lg p-4 space-y-3">
+  1004→                  <div className="flex items-center gap-2">
+  1005→                    <StatusDot tone="info" />
+  1006→                    <p className="text-[13px] font-semibold">Ready to turn in?</p>
+  1007→                  </div>
+  1008→                  {(() => {
+  1009→                    const { missing } = validateSubmission()
+  1010→                    if (missing.length > 0) {
+  1011→                      return (
+  1012→                        <div className="text-xs text-rose-600 space-y-1 rounded-md border border-rose-500/20 bg-rose-500/5 p-2.5">
+  1013→                          <p className="flex items-center gap-1.5 font-medium"><AlertCircle className="h-3.5 w-3.5" /> Missing required fields:</p>
+  1014→                          <ul className="list-disc list-inside pl-2 space-y-0.5">
+  1015→                            {missing.map(m => <li key={m.id}>{m.label}</li>)}
+  1016→                          </ul>
+  1017→                        </div>
+  1018→                      )
+  1019→                    }
+  1020→                    return (
+  1021→                      <div className="text-xs space-y-1 text-muted-foreground">
+  1022→                        {task.submissionRequirements && task.submissionRequirements.length > 0 ? (
+  1023→                          <p className="flex items-center gap-1.5"><StatusDot tone="success" /> All required fields completed</p>
+  1024→                        ) : (
+  1025→                          <>
+  1026→                            <p>Files: {fieldValues['_legacy_files']?.value ? 'Provided' : 'None'}</p>
+  1027→                            <p>Links: {fieldValues['_legacy_links']?.value ? 'Provided' : 'None'}</p>
+  1028→                            <p>Explanation: {submissionNote ? 'Completed' : 'Empty'}</p>
+  1029→                          </>
+  1030→                        )}
+  1031→                        <p className="tabular-nums">Deadline: {task.deadline ? fmtDate(task.deadline, 'd MMM yyyy · h:mm a') : '—'}</p>
+  1032→                      </div>
+  1033→                    )
+  1034→                  })()}
+  1035→                  <div className="flex gap-2 pt-1">
+  1036→                    <Button variant="outline" size="sm" onClick={() => setShowSubmitConfirm(false)}>Back to Edit</Button>
+  1037→                    <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white shadow-card" onClick={submitFinal} disabled={submittingSub}>
+  1038→                      {submittingSub ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Turn In
+  1039→                    </Button>
+  1040→                  </div>
+  1041→                </div>
+  1042→              )}
+  1043→            </Card>
+  1044→          ) : null}
+  1045→
+  1046→          {/* Show submission content if it exists (for non-submitter viewers) */}
+  1047→          {submissions.filter(s => s.status !== 'DRAFT').length > 0 && !canSubmit && (
+  1048→            <Card className="p-5 shadow-card">
+  1049→              <SectionLabel className="mb-3 flex items-center gap-2"><Send className="h-3.5 w-3.5 text-primary" /> Latest Submission</SectionLabel>
+  1050→              <SubmissionContent submission={submissions.find(s => s.status !== 'DRAFT') || submissions[0]} onDownloadFile={downloadFile} />
+  1051→            </Card>
+  1052→          )}
+  1053→
+  1054→          {/* Submission Version History */}
+  1055→          {submissions.length > 0 && (
+  1056→            <Card className="p-5 shadow-card">
+  1057→              <div className="flex items-center justify-between mb-4">
+  1058→                <SectionLabel className="flex items-center gap-2"><Clock className="h-3.5 w-3.5 text-muted-foreground" /> Submission History</SectionLabel>
+  1059→                <span className="text-[10px] text-muted-foreground tabular-nums">{submissions.length} version{submissions.length > 1 ? 's' : ''}</span>
+  1060→              </div>
+  1061→              <Timeline
+  1062→                items={submissions.map((s: any) => {
+  1063→                  const dot: 'default' | 'done' | 'now' =
+  1064→                    s.status === 'APPROVED' ? 'done' :
+  1065→                    s.status === 'CHANGES_REQUESTED' ? 'now' :
+  1066→                    s.status === 'REJECTED' ? 'now' :
+  1067→                    s.status === 'DRAFT' ? 'default' : 'done'
+  1068→                  return {
+  1069→                    dot,
+  1070→                    title: `Version ${s.version} · ${s.status.replace(/_/g, ' ').toLowerCase()}`,
+  1071→                    meta: s.submittedAt ? fmtDate(s.submittedAt, 'd MMM · h:mm a') : undefined,
+  1072→                    body: (
+  1073→                      <div className="space-y-1.5">
+  1074→                        {s.managerScore != null && (
+  1075→                          <span className="inline-flex items-center gap-1 text-[10px] rounded-md bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 font-medium tabular-nums">
+  1076→                            <Award className="h-3 w-3" /> Score {s.managerScore}
+  1077→                          </span>
+  1078→                        )}
+  1079→                        {s.submissionNote && <p className="line-clamp-2">{s.submissionNote}</p>}
+  1080→                        <SubmissionContent submission={s} onDownloadFile={downloadFile} compact />
+  1081→                        {s.managerFeedback && <p className="text-emerald-700 dark:text-emerald-400 italic">Feedback: {s.managerFeedback}</p>}
+  1082→                      </div>
+  1083→                    ),
+  1084→                  }
+  1085→                })}
+  1086→              />
+  1087→            </Card>
+  1088→          )}
+  1089→
+  1090→          {/* AI Evaluation */}
+  1091→          {(task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW' || task.status === 'APPROVED' || task.status === 'COMPLETED') && (
+  1092→            <Card className="p-5 border-violet-500/20 shadow-card">
+  1093→              <div className="flex items-center justify-between mb-4">
+  1094→                <SectionLabel className="flex items-center gap-2"><Bot className="h-3.5 w-3.5 text-violet-600" /> AI Task Evaluation</SectionLabel>
+  1095→                {canEvaluate && task.status === 'SUBMITTED' && (
+  1096→                  <Button size="sm" variant="outline" onClick={runAIEval} disabled={aiLoading} className="gap-1.5 border-violet-500/30 text-violet-600 hover:bg-violet-500/10 h-7">
+  1097→                    {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} {task.aiScore !== null && task.aiScore !== undefined ? 'Re-run' : 'Run'} AI Review
+  1098→                  </Button>
+  1099→                )}
+  1100→              </div>
+  1101→              {task.aiScore !== null && task.aiScore !== undefined ? (
+  1102→                <div className="space-y-4">
+  1103→                  <div className="flex items-center gap-5">
+  1104→                    <div className="relative h-20 w-20 shrink-0">
+  1105→                      <svg className="h-20 w-20 -rotate-90" viewBox="0 0 36 36">
+  1106→                        <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted" />
+  1107→                        <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray={`${task.aiScore}, 100`} strokeLinecap="round" className="text-violet-600" />
+  1108→                      </svg>
+  1109→                      <div className="absolute inset-0 grid place-items-center">
+  1110→                        <div className="text-center">
+  1111→                          <p className="text-[22px] font-bold leading-none tabular-nums">{task.aiScore}</p>
+  1112→                          <p className="text-[8px] text-muted-foreground uppercase tracking-wide mt-0.5">AI</p>
+  1113→                        </div>
+  1114→                      </div>
+  1115→                    </div>
+  1116→                    <div className="min-w-0">
+  1117→                      <p className="text-[13px] font-semibold">Preliminary AI Score</p>
+  1118→                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">Initial assessment by AI. Manager makes the final decision.</p>
+  1119→                      <div className="flex items-center gap-2 mt-2">
+  1120→                        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden max-w-32">
+  1121→                          <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${task.aiScore}%` }} />
+  1122→                        </div>
+  1123→                        <span className="text-[10px] text-muted-foreground tabular-nums">/100</span>
+  1124→                      </div>
+  1125→                    </div>
+  1126→                  </div>
+  1127→                  {task.aiFeedback && (
+  1128→                    <div className="rounded-md border border-border/60 bg-muted/20 p-3">
+  1129→                      <SectionLabel className="mb-1.5">AI Feedback</SectionLabel>
+  1130→                      <pre className="whitespace-pre-wrap font-sans bg-transparent p-0 m-0 text-[12px] text-foreground/80 leading-relaxed">{task.aiFeedback}</pre>
+  1131→                    </div>
+  1132→                  )}
+  1133→                </div>
+  1134→              ) : (
+  1135→                <div className="text-center py-8 rounded-md bg-muted/20 border border-dashed border-border/60">
+  1136→                  <Bot className="h-9 w-9 mx-auto mb-2 text-violet-400" />
+  1137→                  <p className="text-[12px] text-muted-foreground max-w-xs mx-auto leading-relaxed">AI evaluation will analyze the submission against deliverables & criteria.</p>
+  1138→                </div>
+  1139→              )}
+  1140→            </Card>
+  1141→          )}
+  1142→
+  1143→          {/* Manager review — APPROVE / CHANGES REQUESTED / REJECT */}
+  1144→          {canReview && (task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW') && (
+  1145→            <Card className="p-5 border-emerald-500/30 bg-emerald-500/5 shadow-card">
+  1146→              <SectionLabel className="mb-3 flex items-center gap-2"><Award className="h-3.5 w-3.5 text-emerald-600" /> Manager Review</SectionLabel>
+  1147→              <div className="space-y-3.5">
+  1148→                <div>
+  1149→                  <div className="flex items-center justify-between mb-1.5">
+  1150→                    <Label className="text-[11px] text-muted-foreground uppercase tracking-wide">Your Score</Label>
+  1151→                    <span className="text-[20px] font-bold text-emerald-600 tabular-nums leading-none">{managerScore}</span>
+  1152→                  </div>
+  1153→                  <input type="range" min={0} max={100} value={managerScore} onChange={(e) => setManagerScore(parseInt(e.target.value))} className="w-full accent-emerald-600" />
+  1154→                </div>
+  1155→                <Textarea value={managerFeedback} onChange={(e) => setManagerFeedback(e.target.value)} placeholder="Your feedback to the employee…" rows={3} />
+  1156→                <div className="flex flex-wrap gap-2 pt-1">
+  1157→                  <Button onClick={() => act('APPROVE', { managerScore, managerFeedback })} disabled={acting} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white shadow-card"><CheckCircle2 className="h-4 w-4" /> Approve</Button>
+  1158→                  <Button onClick={() => setShowChangesDialog(true)} disabled={acting} variant="outline" className="gap-2 border-amber-500/40 text-amber-600 hover:bg-amber-500/10"><RefreshCw className="h-4 w-4" /> Request Changes</Button>
+  1159→                  <Button onClick={() => act('REJECT', { managerFeedback })} disabled={acting} variant="outline" className="gap-2 border-rose-500/40 text-rose-600 hover:bg-rose-500/10"><XCircle className="h-4 w-4" /> Reject</Button>
+  1160→                  <Button onClick={() => act('COMPLETE', { managerScore, managerFeedback })} disabled={acting} variant="outline" className="gap-2"><Star className="h-4 w-4" /> Complete</Button>
+  1161→                </div>
+  1162→              </div>
+  1163→
+  1164→              {showChangesDialog && (
+  1165→                <div className="mt-4 rounded-lg border border-amber-500/30 bg-card shadow-card-lg p-4 space-y-3">
+  1166→                  <div className="flex items-center gap-2">
+  1167→                    <StatusDot tone="warning" />
+  1168→                    <p className="text-[13px] font-semibold flex items-center gap-2"><RefreshCw className="h-4 w-4 text-amber-600" /> Request Changes</p>
+  1169→                  </div>
+  1170→                  <p className="text-[11px] text-muted-foreground leading-relaxed">The assignee will be notified and can submit a new version. The current version remains in history.</p>
+  1171→                  <Textarea value={managerFeedback} onChange={(e) => setManagerFeedback(e.target.value)} placeholder="What needs to change?" rows={3} />
+  1172→                  <div className="flex gap-2 pt-1">
+  1173→                    <Button variant="outline" size="sm" onClick={() => setShowChangesDialog(false)}>Cancel</Button>
+  1174→                    <Button size="sm" className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white shadow-card" onClick={() => act('CHANGES_REQUESTED', { managerScore, managerFeedback })} disabled={acting}>
+  1175→                      {acting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Request Changes
+  1176→                    </Button>
+  1177→                  </div>
+  1178→                </div>
+  1179→              )}
+  1180→            </Card>
+  1181→          )}
+  1182→
+  1183→          {task.managerScore !== null && task.managerScore !== undefined && (
+  1184→            <Card className="p-5 border-emerald-500/30 shadow-card">
+  1185→              <SectionLabel className="mb-3 flex items-center gap-2"><Award className="h-3.5 w-3.5 text-emerald-600" /> Manager Decision</SectionLabel>
+  1186→              <div className="flex items-center gap-4">
+  1187→                <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 text-emerald-600 grid place-items-center shrink-0">
+  1188→                  <span className="text-xl font-bold tabular-nums">{task.managerScore}</span>
+  1189→                </div>
+  1190→                <div className="min-w-0">
+  1191→                  <p className="text-[13px] font-medium">Final Score</p>
+  1192→                  <p className="text-[11px] text-muted-foreground">By {currentEmployee?.name}</p>
+  1193→                </div>
+  1194→              </div>
+  1195→              {task.managerFeedback && <div className="mt-3 pt-3 border-t border-border/60"><SectionLabel className="mb-1.5">Feedback</SectionLabel><p className="text-[13px] text-foreground/80 leading-relaxed">{task.managerFeedback}</p></div>}
+  1196→            </Card>
+  1197→          )}
+  1198→        </div>
+  1199→
+  1200→        {/* Sidebar */}
+  1201→        <div className="space-y-4">
+  1202→          {task.assignee && (
+  1203→            <Card className="p-4 shadow-card">
+  1204→              <SectionLabel className="mb-2.5 flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground" /> Assigned To</SectionLabel>
+  1205→              <div className="flex items-center gap-3">
+  1206→                <Avatar className="h-10 w-10 rounded-full ring-2 ring-border"><AvatarImage src={task.assignee.photoUrl} /><AvatarFallback className="text-[11px]">{initials(task.assignee.name)}</AvatarFallback></Avatar>
+  1207→                <div className="min-w-0"><p className="text-[13px] font-medium truncate">{task.assignee.name}</p><p className="text-[11px] text-muted-foreground truncate">{task.assignee.designation}</p></div>
+  1208→              </div>
+  1209→            </Card>
+  1210→          )}
+  1211→          <Card className="p-4 shadow-card">
+  1212→            <SectionLabel className="mb-3 flex items-center gap-2"><Clock className="h-3.5 w-3.5 text-muted-foreground" /> Task Lifecycle</SectionLabel>
+  1213→            <Timeline
+  1214→              items={COLUMNS.map((c, i) => {
+  1215→                const currentIdx = COLUMNS.findIndex((x) => x.id === task.status)
+  1216→                const reached = currentIdx >= i
+  1217→                const isNow = i === currentIdx
+  1218→                return {
+  1219→                  dot: isNow ? 'now' as const : reached ? 'done' as const : 'default' as const,
+  1220→                  title: c.label,
+  1221→                  meta: isNow ? 'current' : undefined,
+  1222→                }
+  1223→              })}
+  1224→            />
+  1225→          </Card>
+  1226→        </div>
+  1227→      </div>
+  1228→    </div>
+  1229→  )
+  1230→}
+  1231→
+  1232→// ============================================================
+  1233→// SubmissionContent — renders a submission's fields, files, links
+  1234→// ============================================================
+  1235→function SubmissionContent({ submission, onDownloadFile, compact }: { submission: any; onDownloadFile: (path: string) => void; compact?: boolean }) {
+  1236→  if (!submission) return null
+  1237→  const fields: any[] = Array.isArray(submission.fields) ? submission.fields : []
+  1238→  const files: any[] = Array.isArray(submission.files) ? submission.files : []
+  1239→  const links: any[] = Array.isArray(submission.links) ? submission.links : []
+  1240→
+  1241→  // Legacy: files/links as strings (comma-separated)
+  1242→  const legacyFiles = typeof submission.files === 'string' ? submission.files.split(',').filter(Boolean) : []
+  1243→  const legacyLinks = typeof submission.links === 'string' ? submission.links.split(',').filter(Boolean) : []
+  1244→
+  1245→  if (fields.length === 0 && legacyFiles.length === 0 && legacyLinks.length === 0 && !submission.submissionNote) return null
+  1246→
+  1247→  return (
+  1248→    <div className={`mt-2 space-y-2 ${compact ? '' : 'rounded-lg border border-border bg-muted/20 p-3'}`}>
+  1249→      {fields.map((f: any, i: number) => (
+  1250→        <div key={i} className="space-y-1">
+  1251→          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{f.requirementId}</p>
+  1252→          {f.value && <p className="text-[12px] leading-relaxed">{f.value.length > 200 ? f.value.slice(0, 200) + '…' : f.value}</p>}
+  1253→          {Array.isArray(f.files) && f.files.length > 0 && (
+  1254→            <div className="space-y-1">
+  1255→              {f.files.map((file: any, j: number) => (
+  1256→                <button
+  1257→                  key={j}
+  1258→                  onClick={() => onDownloadFile(file.path)}
+  1259→                  className="flex items-center gap-2 text-[11px] text-primary hover:underline"
+  1260→                >
+  1261→                  <FileIcon className="h-3 w-3" /> {file.name} <span className="text-muted-foreground tabular-nums">({(file.size / 1024).toFixed(1)}KB)</span>
+  1262→                </button>
+  1263→              ))}
+  1264→            </div>
+  1265→          )}
+  1266→        </div>
+  1267→      ))}
+  1268→      {files.length > 0 && (
+  1269→        <div className="flex flex-wrap gap-2">
+  1270→          {files.map((file: any, i: number) => (
+  1271→            <button
+  1272→              key={i}
+  1273→              onClick={() => onDownloadFile(file.path)}
+  1274→              className="flex items-center gap-1.5 text-[11px] rounded-md border border-border bg-muted/30 px-2 py-1 text-primary hover:underline transition-colors"
+  1275→            >
+  1276→              <FileIcon className="h-3 w-3" /> {file.name}
+  1277→            </button>
+  1278→          ))}
+  1279→        </div>
+  1280→      )}
+  1281→      {legacyFiles.length > 0 && (
+  1282→        <p className="text-[11px] text-muted-foreground">📎 {legacyFiles.length} files: {legacyFiles.join(', ')}</p>
+  1283→      )}
+  1284→      {links.length > 0 && (
+  1285→        <div className="flex flex-wrap gap-2">
+  1286→          {links.map((l: any, i: number) => (
+  1287→            <a key={i} href={l.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[11px] text-primary hover:underline">
+  1288→              <LinkIcon className="h-3 w-3" /> {l.label || l.url}
+  1289→            </a>
+  1290→          ))}
+  1291→        </div>
+  1292→      )}
+  1293→      {legacyLinks.length > 0 && (
+  1294→        <div className="space-y-1">
+  1295→          {legacyLinks.map((url: string, i: number) => (
+  1296→            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-[11px] text-primary hover:underline">
+  1297→              <LinkIcon className="h-3 w-3" /> {url}
+  1298→            </a>
+  1299→          ))}
+  1300→        </div>
+  1301→      )}
+  1302→    </div>
+  1303→  )
+  1304→}
+  1305→

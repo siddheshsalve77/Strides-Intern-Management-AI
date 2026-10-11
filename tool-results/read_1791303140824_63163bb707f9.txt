@@ -1,0 +1,2002 @@
+     1→do this in one go evrything :
+     2→# URGENT UI/UX BUG FIX — LAYOUT, OVERLAY & INDEPENDENT SCROLLING
+     3→
+     4→Inspect the current STRIDES ONE application and fix the layout shown in the current preview.
+     5→
+     6→I have attached a screenshot showing the problem.
+     7→
+     8→## 1. CURRENT PROBLEM
+     9→
+    10→The current page has a serious layout/scrolling issue:
+    11→
+    12→- The main content area is partially blank/washed out.
+    13→- Some content appears to be hidden behind an unwanted overlay/layer.
+    14→- The left sidebar and main content are not behaving as two clean independent areas.
+    15→- The page appears to have conflicting height/overflow behavior.
+    16→- The footer is appearing in an incorrect position.
+    17→- The sidebar appears to extend/behave incorrectly when scrolling.
+    18→- The main content does not have a clean independent vertical scroll.
+    19→- The overall application feels like the sidebar, header and content are fighting each other for scroll position.
+    20→
+    21→Fix the ROOT CAUSE instead of adding visual hacks.
+    22→
+    23→---
+    24→
+    25→# 2. REQUIRED FINAL LAYOUT
+    26→
+    27→The application should behave like a professional enterprise/MNC dashboard.
+    28→
+    29→Use this structure:
+    30→
+    31→```text
+    32→┌──────────────────────────────────────────────────────────────┐
+    33→│                     TOP HEADER / TOP BAR                     │
+    34→├───────────────┬──────────────────────────────────────────────┤
+    35→│               │                                              │
+    36→│               │                                              │
+    37→│   SIDEBAR     │             MAIN CONTENT                     │
+    38→│               │                                              │
+    39→│   independent │             independent                     │
+    40→│   scrolling   │             scrolling                       │
+    41→│               │                                              │
+    42→│               │                                              │
+    43→│               │                                              │
+    44→└───────────────┴──────────────────────────────────────────────┘
+    45→```
+    46→
+    47→The sidebar and main content must behave as separate scroll containers.
+    48→
+    49→---
+    50→
+    51→# 3. SIDEBAR SCROLLING
+    52→
+    53→The left sidebar must:
+    54→
+    55→- Stay fixed/sticky on desktop.
+    56→- Occupy the full available viewport height.
+    57→- Have its OWN vertical scrollbar when its menu becomes longer than the viewport.
+    58→- NOT move when the main content scrolls.
+    59→- NOT cause the main content to scroll.
+    60→- NOT expand the overall document height unnecessarily.
+    61→- Keep its own scroll position.
+    62→
+    63→For desktop:
+    64→
+    65→```css
+    66→height: 100vh;
+    67→overflow-y: auto;
+    68→overflow-x: hidden;
+    69→```
+    70→
+    71→Use the actual project's architecture and Tailwind/classes rather than blindly copying this CSS.
+    72→
+    73→The sidebar should remain visually stable while the right side scrolls.
+    74→
+    75→---
+    76→
+    77→# 4. MAIN CONTENT SCROLLING
+    78→
+    79→The main application area must have its OWN vertical scroll.
+    80→
+    81→The main content should:
+    82→
+    83→- Occupy the remaining viewport width.
+    84→- Occupy the available viewport height.
+    85→- Scroll vertically independently.
+    86→- NOT move the sidebar.
+    87→- NOT cause the entire browser page to scroll unnecessarily.
+    88→- Preserve the header position where appropriate.
+    89→
+    90→The layout should effectively use:
+    91→
+    92→```text
+    93→Viewport
+    94→  └── Application Shell
+    95→       ├── Sidebar
+    96→       │    └── independent scroll
+    97→       │
+    98→       └── Main Area
+    99→            ├── Header
+   100→            └── Page Content
+   101→                 └── independent scroll
+   102→```
+   103→
+   104→---
+   105→
+   106→# 5. FIX THE ROOT HEIGHT/OVERFLOW ARCHITECTURE
+   107→
+   108→Inspect the entire component hierarchy for:
+   109→
+   110→- `height: 100%`
+   111→- `min-height`
+   112→- `100vh`
+   113→- `100dvh`
+   114→- `overflow`
+   115→- `overflow-y`
+   116→- `position: fixed`
+   117→- `position: sticky`
+   118→- flex containers
+   119→- grid containers
+   120→- nested scroll containers
+   121→
+   122→The most common cause of this type of bug is missing:
+   123→
+   124→```css
+   125→min-height: 0;
+   126→```
+   127→
+   128→on flex/grid children that are supposed to scroll.
+   129→
+   130→Correct the layout architecture rather than applying random `overflow-hidden` values.
+   131→
+   132→Do NOT simply put:
+   133→
+   134→```css
+   135→overflow: hidden;
+   136→```
+   137→
+   138→everywhere to hide the problem.
+   139→
+   140→---
+   141→
+   142→# 6. TOP HEADER
+   143→
+   144→The top header should remain stable while the main page content scrolls.
+   145→
+   146→On desktop:
+   147→
+   148→- Sidebar stays fixed.
+   149→- Header stays at the top of the application content.
+   150→- Main page content scrolls underneath/within the content area.
+   151→- No double browser scrollbar should appear.
+   152→
+   153→The header must not overlap page content.
+   154→
+   155→---
+   156→
+   157→# 7. REMOVE UNWANTED OVERLAY / WASHED-OUT SCREEN
+   158→
+   159→The screenshot shows the page content appearing extremely faded/washed out.
+   160→
+   161→Investigate whether this is caused by:
+   162→
+   163→- an invisible modal backdrop
+   164→- `fixed` overlay
+   165→- `absolute` overlay
+   166→- incorrect `z-index`
+   167→- AI assistant backdrop
+   168→- dialog/sheet component
+   169→- drawer backdrop
+   170→- `opacity`
+   171→- `backdrop-filter`
+   172→- `pointer-events`
+   173→- loading overlay
+   174→- transparent full-screen element
+   175→- incorrect portal rendering
+   176→- Radix/shadcn Dialog overlay
+   177→- mobile menu overlay remaining mounted
+   178→- AI Assistant overlay remaining active
+   179→
+   180→Find the actual element causing this.
+   181→
+   182→If there is an overlay that should only appear when a modal/drawer is open, make sure it is rendered ONLY when that component is actually open.
+   183→
+   184→The normal dashboard must NEVER appear dimmed.
+   185→
+   186→Expected normal state:
+   187→
+   188→```text
+   189→Sidebar → normal
+   190→Header → normal
+   191→Page content → normal
+   192→Cards → normal
+   193→Text → normal
+   194→Footer → normal
+   195→```
+   196→
+   197→There should be no invisible overlay covering the application.
+   198→
+   199→---
+   200→
+   201→# 8. AI ASSISTANT
+   202→
+   203→The screenshot shows the AI Assistant widget in the lower-left area.
+   204→
+   205→Inspect this component carefully.
+   206→
+   207→It must NOT:
+   208→
+   209→- create an invisible full-screen overlay when closed
+   210→- block clicks on the sidebar
+   211→- change the opacity of the entire application
+   212→- affect scrolling of the sidebar
+   213→- affect scrolling of the main content
+   214→- create an extra body scrollbar
+   215→- create a fixed backdrop when the assistant is not open
+   216→
+   217→When closed, only the small assistant launcher/widget should remain visible.
+   218→
+   219→When opened:
+   220→
+   221→- The assistant panel may be fixed.
+   222→- It should have its own internal scroll.
+   223→- It must not disable normal application scrolling unless intentionally designed as a modal.
+   224→- Closing it must immediately remove its backdrop/overlay.
+   225→
+   226→---
+   227→
+   228→# 9. FOOTER
+   229→
+   230→The footer currently appears in an incorrect position because the page/layout height is probably being calculated incorrectly.
+   231→
+   232→Fix it.
+   233→
+   234→The footer should appear naturally at the bottom of the relevant page content.
+   235→
+   236→It should NOT:
+   237→
+   238→- float in the middle of the viewport
+   239→- remain visible over content
+   240→- cause an unnecessary global scrollbar
+   241→- appear immediately after a tiny amount of content when the page itself should fill the viewport
+   242→
+   243→For short pages, use a proper layout such as:
+   244→
+   245→```text
+   246→Main content
+   247→   ↓
+   248→flex-grow
+   249→   ↓
+   250→Footer
+   251→```
+   252→
+   253→For long pages:
+   254→
+   255→```text
+   256→Main content
+   257→   ↓
+   258→scroll
+   259→   ↓
+   260→Footer at the natural bottom
+   261→```
+   262→
+   263→---
+   264→
+   265→# 10. NO DOUBLE SCROLLBARS
+   266→
+   267→After fixing the layout, check the entire application.
+   268→
+   269→There should NOT be:
+   270→
+   271→- browser scrollbar + duplicate main scrollbar
+   272→- sidebar scrollbar + unexpected body scrollbar
+   273→- horizontal scrollbar
+   274→- nested unnecessary scrollbars
+   275→
+   276→The intended desktop behavior is:
+   277→
+   278→### Sidebar
+   279→
+   280→```text
+   281→OWN vertical scroll
+   282→```
+   283→
+   284→### Main content
+   285→
+   286→```text
+   287→OWN vertical scroll
+   288→```
+   289→
+   290→### Browser body
+   291→
+   292→```text
+   293→NO unnecessary page-level scroll
+   294→```
+   295→
+   296→---
+   297→
+   298→# 11. HORIZONTAL OVERFLOW
+   299→
+   300→Fix any horizontal overflow.
+   301→
+   302→The application should never produce an unexpected horizontal scrollbar because of:
+   303→
+   304→- wide tables
+   305→- cards
+   306→- sidebar width
+   307→- fixed elements
+   308→- charts
+   309→- AI assistant
+   310→- padding
+   311→- long text
+   312→- responsive components
+   313→
+   314→Use responsive containers and appropriate `min-width: 0`.
+   315→
+   316→For tables, use horizontal scrolling INSIDE the table container if necessary.
+   317→
+   318→---
+   319→
+   320→# 12. RESPONSIVE BEHAVIOR
+   321→
+   322→Do not break mobile/tablet behavior while fixing desktop.
+   323→
+   324→### Desktop
+   325→
+   326→```text
+   327→Sidebar visible
+   328→Main content beside sidebar
+   329→Independent scrolling
+   330→```
+   331→
+   332→### Tablet
+   333→
+   334→Use the existing responsive navigation behavior.
+   335→
+   336→### Mobile
+   337→
+   338→Sidebar should become a drawer/mobile navigation where appropriate.
+   339→
+   340→When mobile drawer is closed:
+   341→
+   342→- No overlay
+   343→- No scroll blocking
+   344→- No invisible backdrop
+   345→
+   346→When mobile drawer is open:
+   347→
+   348→- Overlay is intentional
+   349→- Background interaction is disabled appropriately
+   350→- Closing the drawer removes the overlay completely
+   351→
+   352→---
+   353→
+   354→# 13. PAGE ROUTING
+   355→
+   356→Check whether the problem occurs because pages are being rendered inside another scrolling container.
+   357→
+   358→Review:
+   359→
+   360→- App shell
+   361→- Layout
+   362→- Sidebar
+   363→- Header
+   364→- Router
+   365→- Page container
+   366→- Footer
+   367→- AI Assistant
+   368→- Dialogs
+   369→- Drawers
+   370→- Modals
+   371→
+   372→Make sure there is one consistent application shell.
+   373→
+   374→Do not create a separate `100vh`/scroll container for every page.
+   375→
+   376→---
+   377→
+   378→# 14. FIX ALL PAGES, NOT JUST "MY TASKS"
+   379→
+   380→The fix must apply globally.
+   381→
+   382→Test:
+   383→
+   384→- Dashboard
+   385→- My Tasks
+   386→- Task Details
+   387→- Attendance
+   388→- Leave
+   389→- Calendar
+   390→- Projects
+   391→- Performance
+   392→- Goals
+   393→- Learning
+   394→- Documents
+   395→- Service Requests
+   396→- Expenses
+   397→- My Assets
+   398→- Onboarding
+   399→- Directory
+   400→- Announcements
+   401→- Notifications
+   402→- AI Assistant
+   403→- My Profile
+   404→- HR pages
+   405→- Manager pages
+   406→- Admin pages
+   407→
+   408→Every page must use the same stable application shell.
+   409→
+   410→---
+   411→
+   412→# 15. DO NOT DESTROY THE EXISTING DESIGN
+   413→
+   414→This is a BUG FIX.
+   415→
+   416→Do NOT:
+   417→
+   418→- redesign the application
+   419→- replace the sidebar
+   420→- replace the header
+   421→- change the visual theme
+   422→- remove existing modules
+   423→- simplify the UI
+   424→- create a generic dashboard
+   425→- change the Stitch-approved design
+   426→
+   427→Only fix the structural/layout/scrolling problems.
+   428→
+   429→Preserve:
+   430→
+   431→- typography
+   432→- spacing
+   433→- colors
+   434→- icons
+   435→- cards
+   436→- navigation
+   437→- animations
+   438→- responsive behavior
+   439→- existing UX
+   440→
+   441→---
+   442→
+   443→# 16. DEBUG PROPERLY
+   444→
+   445→Before making changes:
+   446→
+   447→1. Inspect the application shell.
+   448→2. Inspect the root layout.
+   449→3. Inspect sidebar implementation.
+   450→4. Inspect header implementation.
+   451→5. Inspect page container.
+   452→6. Inspect footer.
+   453→7. Inspect AI Assistant.
+   454→8. Inspect all fixed/sticky elements.
+   455→9. Inspect overlays/dialogs/drawers.
+   456→10. Inspect global CSS.
+   457→11. Inspect Tailwind classes.
+   458→12. Find the element causing the washed-out screen.
+   459→
+   460→Do not guess.
+   461→
+   462→Identify the actual CSS/layout conflict.
+   463→
+   464→---
+   465→
+   466→# 17. FINAL ACCEPTANCE TEST
+   467→
+   468→After fixing, verify:
+   469→
+   470→### Test 1 — Sidebar
+   471→
+   472→Scroll the main content down.
+   473→
+   474→Expected:
+   475→
+   476→```text
+   477→Sidebar does NOT move.
+   478→```
+   479→
+   480→### Test 2 — Main content
+   481→
+   482→Scroll the sidebar down.
+   483→
+   484→Expected:
+   485→
+   486→```text
+   487→Main content does NOT move.
+   488→```
+   489→
+   490→### Test 3 — Long sidebar
+   491→
+   492→Open enough navigation items to exceed viewport height.
+   493→
+   494→Expected:
+   495→
+   496→```text
+   497→Sidebar gets its own scrollbar.
+   498→```
+   499→
+   500→### Test 4 — Long page
+   501→
+   502→Open a page with lots of content.
+   503→
+   504→Expected:
+   505→
+   506→```text
+   507→Main content gets its own scrollbar.
+   508→```
+   509→
+   510→### Test 5 — AI Assistant closed
+   511→
+   512→Expected:
+   513→
+   514→```text
+   515→No overlay.
+   516→No dimming.
+   517→No blocked clicks.
+   518→No scrolling problems.
+   519→```
+   520→
+   521→### Test 6 — AI Assistant open
+   522→
+   523→Expected:
+   524→
+   525→```text
+   526→Assistant works normally.
+   527→Assistant has its own internal scroll.
+   528→Application layout remains stable.
+   529→```
+   530→
+   531→### Test 7 — Footer
+   532→
+   533→Expected:
+   534→
+   535→```text
+   536→Footer is positioned naturally.
+   537→No floating footer.
+   538→No overlap.
+   539→```
+   540→
+   541→### Test 8 — Browser
+   542→
+   543→Expected:
+   544→
+   545→```text
+   546→No unnecessary global browser scrollbar.
+   547→No horizontal scrollbar.
+   548→```
+   549→
+   550→### Test 9 — Navigation
+   551→
+   552→Navigate between every major page.
+   553→
+   554→Expected:
+   555→
+   556→```text
+   557→Same application shell.
+   558→Same sidebar behavior.
+   559→Same header behavior.
+   560→Same scrolling architecture.
+   561→```
+   562→
+   563→---
+   564→
+   565→# 18. IMPORTANT
+   566→
+   567→Do not tell me the issue is fixed just because the page renders.
+   568→
+   569→Actually test the scrolling behavior and inspect the DOM/CSS.
+   570→
+   571→The final application must feel like a **professional enterprise SaaS/MNC employee portal**, where:
+   572→
+   573→**Sidebar = independent navigation container**
+   574→
+   575→**Header = stable application header**
+   576→
+   577→**Main content = independent scroll container**
+   578→
+   579→**AI Assistant = independent component**
+   580→
+   581→**Footer = natural page content**
+   582→
+   583→**Browser body = no unnecessary scrolling**
+   584→
+   585→Fix the root cause and then verify the entire application before finishing.
+   586→# STRIDES ONE — ADVANCED TASK SUBMISSION, REVIEW SCHEDULING & INTERN MANAGEMENT
+   587→
+   588→The current STRIDES ONE application is already developed.
+   589→
+   590→Now significantly upgrade the existing system into a **production-quality enterprise Intern + Employee Management Platform**.
+   591→
+   592→Do NOT rebuild the application from scratch.
+   593→
+   594→Do NOT replace the existing UI/design.
+   595→
+   596→Keep the existing Stitch-approved visual language, sidebar, header, cards, typography, spacing, navigation, colors, icons and responsive design.
+   597→
+   598→This upgrade should focus on making the workflows **real, connected, automated and efficient**, especially for:
+   599→
+   600→- Intern batch management
+   601→- Intern onboarding
+   602→- Task assignment
+   603→- Professional task submission
+   604→- Submission notifications
+   605→- Review scheduling
+   606→- Manager/Admin review
+   607→- Review reminders
+   608→- Review feedback
+   609→- Resubmission
+   610→- Intern progress
+   611→- Internship completion
+   612→- Firebase synchronization
+   613→- Application scrolling/layout
+   614→
+   615→---
+   616→
+   617→# 1. CORE WORKFLOW
+   618→
+   619→The most important new workflow is:
+   620→
+   621→```text
+   622→TASK CREATED
+   623→      ↓
+   624→TASK ASSIGNED
+   625→      ↓
+   626→INTERN WORKS ON TASK
+   627→      ↓
+   628→SAVE DRAFT
+   629→      ↓
+   630→FINAL SUBMISSION
+   631→      ↓
+   632→MANAGER / ADMIN NOTIFIED
+   633→      ↓
+   634→REVIEW REQUEST CREATED
+   635→      ↓
+   636→MANAGER / ADMIN SCHEDULES REVIEW
+   637→      ↓
+   638→INTERN NOTIFIED OF REVIEW SCHEDULE
+   639→      ↓
+   640→REVIEW SESSION / REVIEW WINDOW
+   641→      ↓
+   642→MANAGER / ADMIN REVIEWS SUBMISSION
+   643→      ↓
+   644→AI ASSISTED REVIEW
+   645→      ↓
+   646→HUMAN FINAL REVIEW
+   647→      ↓
+   648→SCORE + FEEDBACK
+   649→      ↓
+   650→APPROVED
+   651→       OR
+   652→CHANGES REQUESTED
+   653→      ↓
+   654→RESUBMISSION IF REQUIRED
+   655→      ↓
+   656→FINAL APPROVAL
+   657→      ↓
+   658→TASK COMPLETED
+   659→      ↓
+   660→INTERN PROGRESS UPDATED
+   661→```
+   662→
+   663→This entire lifecycle must be implemented using Firebase-backed data.
+   664→
+   665→---
+   666→
+   667→# 2. TASK SUBMISSION MUST BE A PROFESSIONAL WORKSPACE
+   668→
+   669→Do NOT use a basic:
+   670→
+   671→```text
+   672→Upload File
+   673→Submit
+   674→```
+   675→
+   676→interface.
+   677→
+   678→Create a dedicated **Task Submission Workspace**.
+   679→
+   680→When an intern opens a task, show:
+   681→
+   682→## Task Header
+   683→
+   684→- Task title
+   685→- Project
+   686→- Priority
+   687→- Assigned by
+   688→- Deadline
+   689→- Time remaining
+   690→- Status
+   691→- Review status
+   692→
+   693→Example:
+   694→
+   695→```text
+   696→ETL Pipeline Implementation
+   697→
+   698→Assigned by:
+   699→Rahul Sharma
+   700→
+   701→Deadline:
+   702→12 Oct 2026 · 6:00 PM
+   703→
+   704→Status:
+   705→In Progress
+   706→
+   707→Review:
+   708→Not Submitted
+   709→```
+   710→
+   711→---
+   712→
+   713→# 3. TASK REQUIREMENTS
+   714→
+   715→Every task should clearly display:
+   716→
+   717→### Objective
+   718→
+   719→What the intern needs to accomplish.
+   720→
+   721→### Requirements
+   722→
+   723→A checklist of required deliverables.
+   724→
+   725→Example:
+   726→
+   727→```text
+   728→☑ Python ETL script
+   729→☑ SQL queries
+   730→☑ README
+   731→☑ Data validation
+   732→☐ Final explanation
+   733→```
+   734→
+   735→### Expected Output
+   736→
+   737→Clearly describe what the manager expects.
+   738→
+   739→### Evaluation Criteria
+   740→
+   741→Show the intern how the task will be evaluated.
+   742→
+   743→Example:
+   744→
+   745→```text
+   746→Code Quality       20
+   747→Correctness        30
+   748→Documentation      15
+   749→Problem Solving    20
+   750→Completeness       15
+   751→```
+   752→
+   753→This makes the review process transparent.
+   754→
+   755→---
+   756→
+   757→# 4. SAVE DRAFT
+   758→
+   759→Interns must be able to save their submission as a draft.
+   760→
+   761→Draft should preserve:
+   762→
+   763→- Text explanation
+   764→- Links
+   765→- Uploaded files
+   766→- Notes
+   767→- Checklist progress
+   768→
+   769→Show:
+   770→
+   771→```text
+   772→Draft saved 2 minutes ago
+   773→```
+   774→
+   775→Auto-save where appropriate.
+   776→
+   777→Do not lose work if the page is refreshed.
+   778→
+   779→---
+   780→
+   781→# 5. SUBMISSION TYPES
+   782→
+   783→Support multiple submission methods.
+   784→
+   785→### File
+   786→
+   787→- PDF
+   788→- DOCX
+   789→- XLSX
+   790→- ZIP
+   791→- Images
+   792→- Code files
+   793→
+   794→### Links
+   795→
+   796→- GitHub
+   797→- GitLab
+   798→- Google Drive
+   799→- Demo URL
+   800→- Project URL
+   801→
+   802→### Written response
+   803→
+   804→Rich text explanation.
+   805→
+   806→### Multiple submission types
+   807→
+   808→A task can require:
+   809→
+   810→```text
+   811→File + GitHub + Explanation
+   812→```
+   813→
+   814→---
+   815→
+   816→# 6. DRAG & DROP FILE UPLOAD
+   817→
+   818→Create a professional upload area:
+   819→
+   820→```text
+   821→┌─────────────────────────────────────────┐
+   822→│                                         │
+   823→│       Drag & drop files here            │
+   824→│                                         │
+   825→│       or                                │
+   826→│       Browse files                      │
+   827→│                                         │
+   828→│       Max file size: configurable       │
+   829→│                                         │
+   830→└─────────────────────────────────────────┘
+   831→```
+   832→
+   833→Show upload progress.
+   834→
+   835→Show:
+   836→
+   837→- filename
+   838→- file type
+   839→- size
+   840→- upload status
+   841→- remove option
+   842→- preview where possible
+   843→
+   844→Use Firebase Storage.
+   845→
+   846→---
+   847→
+   848→# 7. SUBMISSION VALIDATION
+   849→
+   850→Before final submission:
+   851→
+   852→Validate:
+   853→
+   854→- Required files
+   855→- Required links
+   856→- Required explanation
+   857→- Required checklist items
+   858→- File size
+   859→- Supported file types
+   860→- Deadline
+   861→
+   862→If something is missing:
+   863→
+   864→```text
+   865→You still need to complete:
+   866→
+   867→• README file
+   868→• Project explanation
+   869→```
+   870→
+   871→Do not allow incomplete final submission if the task requires those fields.
+   872→
+   873→---
+   874→
+   875→# 8. FINAL SUBMISSION CONFIRMATION
+   876→
+   877→Before submission show:
+   878→
+   879→```text
+   880→Ready to submit?
+   881→
+   882→Task:
+   883→ETL Pipeline Implementation
+   884→
+   885→Files:
+   886→3
+   887→
+   888→Links:
+   889→1
+   890→
+   891→Explanation:
+   892→Completed
+   893→
+   894→Requirements:
+   895→5 / 5 complete
+   896→
+   897→Deadline:
+   898→12 Oct · 6:00 PM
+   899→
+   900→[Back to Edit]     [Submit Final]
+   901→```
+   902→
+   903→After submission:
+   904→
+   905→```text
+   906→Submission successfully received ✓
+   907→
+   908→Your manager has been notified.
+   909→
+   910→You will be notified when your review is scheduled.
+   911→```
+   912→
+   913→---
+   914→
+   915→# 9. SUBMISSION VERSION HISTORY
+   916→
+   917→Never overwrite previous submissions.
+   918→
+   919→Every submission must create a version.
+   920→
+   921→Example:
+   922→
+   923→```text
+   924→Version 1
+   925→8 Oct · 4:20 PM
+   926→Score: 62
+   927→Changes requested
+   928→
+   929→Version 2
+   930→9 Oct · 7:10 PM
+   931→Score: 78
+   932→Changes requested
+   933→
+   934→Version 3
+   935→10 Oct · 3:45 PM
+   936→Score: 91
+   937→Approved
+   938→```
+   939→
+   940→Each version should preserve:
+   941→
+   942→- files
+   943→- links
+   944→- explanation
+   945→- timestamp
+   946→- reviewer
+   947→- score
+   948→- feedback
+   949→- status
+   950→
+   951→---
+   952→
+   953→# 10. SUBMISSION NOTIFICATION
+   954→
+   955→When an intern submits a task:
+   956→
+   957→Automatically generate notification(s).
+   958→
+   959→For the assigned reviewer:
+   960→
+   961→```text
+   962→New Task Submission
+   963→
+   964→Siddhesh Patil submitted:
+   965→
+   966→"ETL Pipeline Implementation"
+   967→
+   968→Submitted:
+   969→6 Oct · 4:42 PM
+   970→
+   971→Deadline:
+   972→6 Oct · 6:00 PM
+   973→
+   974→[Review Submission]
+   975→```
+   976→
+   977→Notify the appropriate:
+   978→
+   979→- Manager
+   980→- Assigned reviewer
+   981→- Authorized Admin
+   982→
+   983→Do NOT notify every employee in the company.
+   984→
+   985→Notification recipients must come from task/reviewer assignments.
+   986→
+   987→---
+   988→
+   989→# 11. REVIEW REQUEST
+   990→
+   991→After submission, automatically create a **Review Request**.
+   992→
+   993→Review request should contain:
+   994→
+   995→- Task ID
+   996→- Submission ID
+   997→- Intern ID
+   998→- Reviewer ID
+   999→- Submission timestamp
+  1000→- Deadline
+  1001→- Priority
+  1002→- Suggested review duration
+  1003→- Status
+  1004→
+  1005→Example:
+  1006→
+  1007→```text
+  1008→Review Request
+  1009→
+  1010→Intern:
+  1011→Siddhesh Patil
+  1012→
+  1013→Task:
+  1014→ETL Pipeline
+  1015→
+  1016→Status:
+  1017→Awaiting Review
+  1018→
+  1019→Suggested Review Time:
+  1020→15 minutes
+  1021→
+  1022→Priority:
+  1023→High
+  1024→```
+  1025→
+  1026→---
+  1027→
+  1028→# 12. REVIEW CENTER
+  1029→
+  1030→Create a dedicated **Review Center** for Managers/Admins.
+  1031→
+  1032→This should become the main workspace for reviewing submissions.
+  1033→
+  1034→Dashboard:
+  1035→
+  1036→```text
+  1037→REVIEW CENTER
+  1038→
+  1039→Pending Reviews       8
+  1040→Scheduled Reviews     3
+  1041→Overdue Reviews       2
+  1042→Completed Today       6
+  1043→
+  1044→--------------------------------
+  1045→
+  1046→Needs Action
+  1047→
+  1048→🔴 2 overdue
+  1049→🟠 3 due today
+  1050→🟡 3 scheduled
+  1051→```
+  1052→
+  1053→Managers should not need to search through different pages.
+  1054→
+  1055→Everything requiring review should appear here.
+  1056→
+  1057→---
+  1058→
+  1059→# 13. REVIEW SCHEDULING
+  1060→
+  1061→This is a key feature.
+  1062→
+  1063→After receiving a submission, the Manager/Admin can choose:
+  1064→
+  1065→### Review Now
+  1066→
+  1067→Immediately review the task.
+  1068→
+  1069→### Schedule Review
+  1070→
+  1071→Select:
+  1072→
+  1073→- Date
+  1074→- Time
+  1075→- Estimated duration
+  1076→- Reviewer
+  1077→- Optional meeting/link
+  1078→- Notes
+  1079→
+  1080→Example:
+  1081→
+  1082→```text
+  1083→Schedule Review
+  1084→
+  1085→Intern:
+  1086→Siddhesh Patil
+  1087→
+  1088→Task:
+  1089→ETL Pipeline
+  1090→
+  1091→Date:
+  1092→8 Oct 2026
+  1093→
+  1094→Time:
+  1095→3:30 PM
+  1096→
+  1097→Duration:
+  1098→20 minutes
+  1099→
+  1100→Reviewer:
+  1101→Rahul Sharma
+  1102→
+  1103→Meeting:
+  1104→Optional
+  1105→
+  1106→[Schedule Review]
+  1107→```
+  1108→
+  1109→---
+  1110→
+  1111→# 14. REVIEW SCHEDULE NOTIFICATION
+  1112→
+  1113→Once the review is scheduled:
+  1114→
+  1115→Automatically notify the intern.
+  1116→
+  1117→Example:
+  1118→
+  1119→```text
+  1120→Review Scheduled
+  1121→
+  1122→Your task review has been scheduled.
+  1123→
+  1124→Task:
+  1125→ETL Pipeline Implementation
+  1126→
+  1127→Reviewer:
+  1128→Rahul Sharma
+  1129→
+  1130→Date:
+  1131→8 Oct 2026
+  1132→
+  1133→Time:
+  1134→3:30 PM
+  1135→
+  1136→Duration:
+  1137→20 minutes
+  1138→
+  1139→[View Task]   [View Review]
+  1140→```
+  1141→
+  1142→Also notify the reviewer.
+  1143→
+  1144→---
+  1145→
+  1146→# 15. REVIEW CALENDAR
+  1147→
+  1148→Add review events to the appropriate calendars.
+  1149→
+  1150→### Intern Calendar
+  1151→
+  1152→Shows:
+  1153→
+  1154→- Review date
+  1155→- Reviewer
+  1156→- Task
+  1157→- Time
+  1158→
+  1159→### Manager Calendar
+  1160→
+  1161→Shows:
+  1162→
+  1163→- Pending reviews
+  1164→- Scheduled reviews
+  1165→- Team meetings
+  1166→
+  1167→### HR Calendar
+  1168→
+  1169→Only show appropriate organization-level information.
+  1170→
+  1171→---
+  1172→
+  1173→# 16. REVIEW REMINDERS
+  1174→
+  1175→Automatically notify:
+  1176→
+  1177→### Intern
+  1178→
+  1179→Example:
+  1180→
+  1181→```text
+  1182→Your ETL Pipeline review starts in 1 hour.
+  1183→```
+  1184→
+  1185→### Reviewer
+  1186→
+  1187→Example:
+  1188→
+  1189→```text
+  1190→Your review with Siddhesh starts in 1 hour.
+  1191→```
+  1192→
+  1193→Use configurable reminder intervals.
+  1194→
+  1195→Example:
+  1196→
+  1197→```text
+  1198→24 hours before
+  1199→1 hour before
+  1200→15 minutes before
+  1201→```
+  1202→
+  1203→Do not spam users.
+  1204→
+  1205→---
+  1206→
+  1207→# 17. REVIEW RESCHEDULING
+  1208→
+  1209→Managers should be able to reschedule a review.
+  1210→
+  1211→If rescheduled:
+  1212→
+  1213→1. Update Firebase.
+  1214→2. Notify the intern.
+  1215→3. Notify reviewer.
+  1216→4. Update calendar.
+  1217→5. Record the change in audit log.
+  1218→
+  1219→Example:
+  1220→
+  1221→```text
+  1222→Review rescheduled
+  1223→
+  1224→Previous:
+  1225→3:30 PM
+  1226→
+  1227→New:
+  1228→5:00 PM
+  1229→
+  1230→Reason:
+  1231→Reviewer unavailable
+  1232→```
+  1233→
+  1234→---
+  1235→
+  1236→# 18. REVIEW CANCELLATION
+  1237→
+  1238→Authorized reviewers can cancel a scheduled review.
+  1239→
+  1240→Require a reason.
+  1241→
+  1242→Notify the intern.
+  1243→
+  1244→Example:
+  1245→
+  1246→```text
+  1247→Your review scheduled for 3:30 PM has been cancelled.
+  1248→
+  1249→Reason:
+  1250→Manager unavailable.
+  1251→
+  1252→A new review time will be scheduled shortly.
+  1253→```
+  1254→
+  1255→---
+  1256→
+  1257→# 19. QUICK REVIEW MODE
+  1258→
+  1259→Managers are busy.
+  1260→
+  1261→Create a fast review interface.
+  1262→
+  1263→Do NOT force them to navigate through multiple pages.
+  1264→
+  1265→Use a layout like:
+  1266→
+  1267→```text
+  1268→┌─────────────────────────────────────────────────────────┐
+  1269→│ Review: ETL Pipeline                    1 of 8          │
+  1270→├───────────────────────┬─────────────────────────────────┤
+  1271→│ Intern                │ Evaluation                      │
+  1272→│                       │                                 │
+  1273→│ Siddhesh Patil        │ Code Quality        /20         │
+  1274→│                       │ Correctness         /30         │
+  1275→│ Submission            │ Documentation       /15         │
+  1276→│                       │ Problem Solving     /20         │
+  1277→│ Files                 │ Completeness        /15         │
+  1278→│ GitHub                │                                 │
+  1279→│ Explanation           │ Final Score         /100        │
+  1280→│                       │                                 │
+  1281→│ AI Summary            │ Feedback                        │
+  1282→│                       │ [.........................]     │
+  1283→│                       │                                 │
+  1284→│                       │ [Request Changes] [Approve]     │
+  1285→└───────────────────────┴─────────────────────────────────┘
+  1286→```
+  1287→
+  1288→---
+  1289→
+  1290→# 20. "NEXT REVIEW" BUTTON
+  1291→
+  1292→After a manager submits a review:
+  1293→
+  1294→Show:
+  1295→
+  1296→```text
+  1297→Review submitted successfully ✓
+  1298→
+  1299→7 reviews remaining
+  1300→
+  1301→[Review Next]
+  1302→```
+  1303→
+  1304→Clicking **Review Next** should immediately open the next prioritized review.
+  1305→
+  1306→This is extremely important for saving manager time.
+  1307→
+  1308→---
+  1309→
+  1310→# 21. REVIEW QUEUE PRIORITIZATION
+  1311→
+  1312→Automatically order reviews based on:
+  1313→
+  1314→1. Overdue review
+  1315→2. Deadline approaching
+  1316→3. High-priority task
+  1317→4. Scheduled review
+  1318→5. Oldest submission
+  1319→
+  1320→Example:
+  1321→
+  1322→```text
+  1323→🔴 Overdue
+  1324→🟠 Due today
+  1325→🟡 Scheduled
+  1326→🟢 Normal
+  1327→```
+  1328→
+  1329→Managers can still manually filter.
+  1330→
+  1331→---
+  1332→
+  1333→# 22. REVIEW TEMPLATES
+  1334→
+  1335→Managers should be able to create reusable feedback templates.
+  1336→
+  1337→Examples:
+  1338→
+  1339→```text
+  1340→Good implementation.
+  1341→
+  1342→Please improve the documentation.
+  1343→
+  1344→Please add error handling.
+  1345→
+  1346→Please include additional test cases.
+  1347→
+  1348→The overall approach is correct but needs optimization.
+  1349→```
+  1350→
+  1351→Allow:
+  1352→
+  1353→**Insert Feedback Template**
+  1354→
+  1355→Then manager can modify it before submission.
+  1356→
+  1357→This saves time.
+  1358→
+  1359→---
+  1360→
+  1361→# 23. AI REVIEW ASSISTANT
+  1362→
+  1363→When a task is submitted, AI can prepare a preliminary review.
+  1364→
+  1365→Example:
+  1366→
+  1367→```text
+  1368→AI REVIEW SUMMARY
+  1369→
+  1370→Overall:
+  1371→Strong submission
+  1372→
+  1373→Strengths:
+  1374→• Clean implementation
+  1375→• Good structure
+  1376→• Correct output
+  1377→
+  1378→Potential Issues:
+  1379→• Documentation incomplete
+  1380→• Error handling limited
+  1381→
+  1382→Suggested Score:
+  1383→84/100
+  1384→
+  1385→Estimated Review Time:
+  1386→8 minutes
+  1387→```
+  1388→
+  1389→The manager must make the final decision.
+  1390→
+  1391→AI cannot automatically approve a submission.
+  1392→
+  1393→---
+  1394→
+  1395→# 24. AI SHOULD SAVE REVIEWER TIME
+  1396→
+  1397→AI should help summarize:
+  1398→
+  1399→- Submission
+  1400→- Files
+  1401→- GitHub/project content where permitted
+  1402→- Written explanation
+  1403→- Previous feedback
+  1404→- Changes between versions
+  1405→
+  1406→For resubmission:
+  1407→
+  1408→```text
+  1409→Changes Since Previous Version
+  1410→
+  1411→✓ Added error handling
+  1412→✓ Improved README
+  1413→✓ Added validation
+  1414→
+  1415→Still needs attention:
+  1416→• Test coverage
+  1417→```
+  1418→
+  1419→This allows the reviewer to focus on important issues.
+  1420→
+  1421→---
+  1422→
+  1423→# 25. REVIEW RUBRIC
+  1424→
+  1425→Every task can define its own evaluation rubric.
+  1426→
+  1427→Example:
+  1428→
+  1429→```text
+  1430→Technical Correctness      30
+  1431→Code Quality               20
+  1432→Problem Solving            20
+  1433→Documentation              15
+  1434→Completeness               15
+  1435→TOTAL                     100
+  1436→```
+  1437→
+  1438→Different task templates can have different rubrics.
+  1439→
+  1440→---
+  1441→
+  1442→# 26. REQUEST CHANGES
+  1443→
+  1444→If the task is not ready:
+  1445→
+  1446→Manager clicks:
+  1447→
+  1448→**Request Changes**
+  1449→
+  1450→Require:
+  1451→
+  1452→- Feedback
+  1453→- Required changes
+  1454→- Optional deadline
+  1455→
+  1456→Then:
+  1457→
+  1458→```text
+  1459→Task Status:
+  1460→Changes Requested
+  1461→```
+  1462→
+  1463→Intern receives notification.
+  1464→
+  1465→---
+  1466→
+  1467→# 27. RESUBMISSION WORKFLOW
+  1468→
+  1469→Intern sees:
+  1470→
+  1471→```text
+  1472→Changes Requested
+  1473→
+  1474→Reviewer:
+  1475→Rahul Sharma
+  1476→
+  1477→Required Changes:
+  1478→
+  1479→1. Add validation
+  1480→2. Improve documentation
+  1481→3. Fix SQL query
+  1482→
+  1483→[Create New Submission]
+  1484→```
+  1485→
+  1486→The intern submits Version 2.
+  1487→
+  1488→The reviewer sees the previous review beside the new submission.
+  1489→
+  1490→---
+  1491→
+  1492→# 28. REVIEW COMPARISON
+  1493→
+  1494→For resubmissions provide:
+  1495→
+  1496→```text
+  1497→Version 1          Version 2
+  1498→
+  1499→Score: 64          Score: 82
+  1500→
+  1501→Issues:
+  1502→3                  1
+  1503→
+  1504→Documentation:
+  1505→Incomplete         Complete
+  1506→
+  1507→Validation:
+  1508→Missing            Added
+  1509→```
+  1510→
+  1511→AI can summarize the differences.
+  1512→
+  1513→---
+  1514→
+  1515→# 29. FINAL APPROVAL
+  1516→
+  1517→Reviewer chooses:
+  1518→
+  1519→### Approve
+  1520→
+  1521→Task becomes:
+  1522→
+  1523→```text
+  1524→COMPLETED
+  1525→```
+  1526→
+  1527→### Request Changes
+  1528→
+  1529→Task becomes:
+  1530→
+  1531→```text
+  1532→CHANGES REQUESTED
+  1533→```
+  1534→
+  1535→### Reject
+  1536→
+  1537→Only where appropriate and require a reason.
+  1538→
+  1539→---
+  1540→
+  1541→# 30. INTERN PROGRESS AUTOMATICALLY UPDATES
+  1542→
+  1543→When task is approved:
+  1544→
+  1545→Automatically update:
+  1546→
+  1547→- Task completion
+  1548→- Batch progress
+  1549→- Intern progress
+  1550→- Project progress
+  1551→- Performance metrics
+  1552→- Completion percentage
+  1553→
+  1554→Do not manually update these values.
+  1555→
+  1556→Calculate them from Firebase data.
+  1557→
+  1558→---
+  1559→
+  1560→# 31. INTERN BATCH MANAGEMENT
+  1561→
+  1562→Create a dedicated HR **Batch Management Center**.
+  1563→
+  1564→HR should see:
+  1565→
+  1566→```text
+  1567→Intern Batches
+  1568→
+  1569→Summer 2026
+  1570→24 Interns
+  1571→82% Average Progress
+  1572→94% Attendance
+  1573→7 Pending Reviews
+  1574→
+  1575→Winter 2026
+  1576→18 Interns
+  1577→61% Average Progress
+  1578→91% Attendance
+  1579→12 Pending Reviews
+  1580→```
+  1581→
+  1582→---
+  1583→
+  1584→# 32. BATCH CREATION WIZARD
+  1585→
+  1586→Create a guided batch setup.
+  1587→
+  1588→### Step 1
+  1589→
+  1590→Batch information
+  1591→
+  1592→- Batch name
+  1593→- Program
+  1594→- Department
+  1595→- Start date
+  1596→- End date
+  1597→- Capacity
+  1598→
+  1599→### Step 2
+  1600→
+  1601→Management
+  1602→
+  1603→- Manager
+  1604→- Mentors
+  1605→- HR owner
+  1606→
+  1607→### Step 3
+  1608→
+  1609→Onboarding template
+  1610→
+  1611→Choose:
+  1612→
+  1613→- Standard onboarding
+  1614→- Data internship onboarding
+  1615→- Software development onboarding
+  1616→- Custom onboarding
+  1617→
+  1618→### Step 4
+  1619→
+  1620→Task template
+  1621→
+  1622→Choose standard tasks.
+  1623→
+  1624→### Step 5
+  1625→
+  1626→Review configuration
+  1627→
+  1628→Configure:
+  1629→
+  1630→- Review SLA
+  1631→- Reminder schedule
+  1632→- Evaluation rubric
+  1633→
+  1634→### Step 6
+  1635→
+  1636→Confirm
+  1637→
+  1638→Create batch.
+  1639→
+  1640→---
+  1641→
+  1642→# 33. BULK INTERN IMPORT
+  1643→
+  1644→HR should be able to add multiple interns efficiently.
+  1645→
+  1646→Support CSV import.
+  1647→
+  1648→Example columns:
+  1649→
+  1650→```text
+  1651→Name
+  1652→Email
+  1653→Phone
+  1654→Department
+  1655→Designation
+  1656→Manager
+  1657→Batch
+  1658→Start Date
+  1659→End Date
+  1660→Role
+  1661→```
+  1662→
+  1663→Before importing:
+  1664→
+  1665→Show validation preview.
+  1666→
+  1667→Example:
+  1668→
+  1669→```text
+  1670→25 records found
+  1671→
+  1672→23 valid
+  1673→2 errors
+  1674→
+  1675→Row 14:
+  1676→Invalid email
+  1677→
+  1678→Row 19:
+  1679→Manager not found
+  1680→```
+  1681→
+  1682→Do not create accounts until HR confirms the import.
+  1683→
+  1684→---
+  1685→
+  1686→# 34. BULK ACTIONS
+  1687→
+  1688→HR can select multiple interns:
+  1689→
+  1690→```text
+  1691→☑ Intern A
+  1692→☑ Intern B
+  1693→☑ Intern C
+  1694→```
+  1695→
+  1696→Allowed actions:
+  1697→
+  1698→- Assign batch
+  1699→- Assign manager
+  1700→- Assign mentor
+  1701→- Send onboarding reminder
+  1702→- Activate
+  1703→- Deactivate where authorized
+  1704→
+  1705→All bulk actions must be audited.
+  1706→
+  1707→---
+  1708→
+  1709→# 35. ONBOARDING CENTER
+  1710→
+  1711→HR should have an onboarding dashboard.
+  1712→
+  1713→Show:
+  1714→
+  1715→```text
+  1716→ONBOARDING
+  1717→
+  1718→24 Interns
+  1719→
+  1720→Completed             16
+  1721→In Progress             6
+  1722→Not Started             2
+  1723→
+  1724→Average completion:
+  1725→87%
+  1726→```
+  1727→
+  1728→Filter by:
+  1729→
+  1730→- Batch
+  1731→- Department
+  1732→- Manager
+  1733→- Status
+  1734→
+  1735→---
+  1736→
+  1737→# 36. PERSONALIZED ONBOARDING FOR INTERN
+  1738→
+  1739→Intern sees:
+  1740→
+  1741→```text
+  1742→Welcome to Strides Software 👋
+  1743→
+  1744→Your onboarding
+  1745→
+  1746→████████████░░ 80%
+  1747→
+  1748→6 of 8 completed
+  1749→
+  1750→Next:
+  1751→Complete Security Training
+  1752→
+  1753→Due:
+  1754→Tomorrow
+  1755→```
+  1756→
+  1757→Make it feel like a guided journey.
+  1758→
+  1759→---
+  1760→
+  1761→# 37. ONBOARDING CHECKLIST
+  1762→
+  1763→Include:
+  1764→
+  1765→- Personal profile
+  1766→- Contact information
+  1767→- Documents
+  1768→- Policies
+  1769→- NDA
+  1770→- Security training
+  1771→- Team introduction
+  1772→- Manager introduction
+  1773→- Technical setup
+  1774→- First task
+  1775→
+  1776→HR can configure checklist items.
+  1777→
+  1778→---
+  1779→
+  1780→# 38. ONBOARDING AUTOMATION
+  1781→
+  1782→When HR activates an intern:
+  1783→
+  1784→Automatically:
+  1785→
+  1786→```text
+  1787→Create account
+  1788→↓
+  1789→Assign batch
+  1790→↓
+  1791→Assign manager
+  1792→↓
+  1793→Assign mentor
+  1794→↓
+  1795→Generate onboarding checklist
+  1796→↓
+  1797→Create notifications
+  1798→↓
+  1799→Assign standard tasks
+  1800→↓
+  1801→Add calendar events
+  1802→```
+  1803→
+  1804→---
+  1805→
+  1806→# 39. BATCH ANALYTICS
+  1807→
+  1808→Show:
+  1809→
+  1810→- Total interns
+  1811→- Active
+  1812→- Completed
+  1813→- At-risk
+  1814→- Average attendance
+  1815→- Task completion
+  1816→- Average score
+  1817→- Review turnaround
+  1818→- Onboarding completion
+  1819→- Final completion rate
+  1820→
+  1821→---
+  1822→
+  1823→# 40. AT-RISK INTERN DETECTION
+  1824→
+  1825→Identify interns requiring attention.
+  1826→
+  1827→Signals:
+  1828→
+  1829→- Low attendance
+  1830→- Overdue tasks
+  1831→- Low scores
+  1832→- Multiple changes requested
+  1833→- No recent activity
+  1834→- Incomplete onboarding
+  1835→- Missed review
+  1836→
+  1837→Show:
+  1838→
+  1839→```text
+  1840→⚠ Attention Required
+  1841→
+  1842→Siddhesh Patil
+  1843→
+  1844→Reason:
+  1845→2 overdue tasks
+  1846→1 pending review
+  1847→Attendance below threshold
+  1848→
+  1849→Suggested action:
+  1850→Manager check-in
+  1851→```
+  1852→
+  1853→AI can summarize but must NOT make employment decisions.
+  1854→
+  1855→---
+  1856→
+  1857→# 41. MANAGER ACTION CENTER
+  1858→
+  1859→Manager's homepage should prioritize actions.
+  1860→
+  1861→Example:
+  1862→
+  1863→```text
+  1864→NEEDS YOUR ATTENTION
+  1865→
+  1866→🔴 2 overdue reviews
+  1867→🟠 3 submissions awaiting scheduling
+  1868→🟡 2 reviews today
+  1869→🟢 5 tasks due this week
+  1870→
+  1871→[Open Review Center]
+  1872→```
+  1873→
+  1874→The goal is to reduce administrative work.
+  1875→
+  1876→---
+  1877→
+  1878→# 42. REVIEW SLA
+  1879→
+  1880→Allow HR/Admin to configure expected review time.
+  1881→
+  1882→Example:
+  1883→
+  1884→```text
+  1885→Normal:
+  1886→24 hours
+  1887→
+  1888→High priority:
+  1889→8 hours
+  1890→
+  1891→Urgent:
+  1892→4 hours
+  1893→```
+  1894→
+  1895→If reviewer does not act within SLA:
+  1896→
+  1897→```text
+  1898→Reminder
+  1899→↓
+  1900→Escalation
+  1901→↓
+  1902→HR notification
+  1903→```
+  1904→
+  1905→Make the workflow configurable.
+  1906→
+  1907→---
+  1908→
+  1909→# 43. REVIEW TURNAROUND ANALYTICS
+  1910→
+  1911→Track:
+  1912→
+  1913→- Average review time
+  1914→- Pending review count
+  1915→- Overdue reviews
+  1916→- Reviews completed per manager
+  1917→- SLA compliance
+  1918→
+  1919→Managers should see their own workload.
+  1920→
+  1921→HR can see organization-level review metrics where authorized.
+  1922→
+  1923→---
+  1924→
+  1925→# 44. MANAGER WORKLOAD BALANCING
+  1926→
+  1927→Show:
+  1928→
+  1929→```text
+  1930→Reviewer Workload
+  1931→
+  1932→Rahul Sharma
+  1933→8 pending reviews
+  1934→
+  1935→Amit Joshi
+  1936→3 pending reviews
+  1937→
+  1938→Priya Shah
+  1939→11 pending reviews
+  1940→```
+  1941→
+  1942→When assigning a reviewer, optionally show workload.
+  1943→
+  1944→Do not automatically reassign without authorization.
+  1945→
+  1946→---
+  1947→
+  1948→# 45. TASK REVIEW APPOINTMENT / SLOT SYSTEM
+  1949→
+  1950→For tasks requiring a live discussion, allow the reviewer to define:
+  1951→
+  1952→- Date
+  1953→- Time
+  1954→- Duration
+  1955→- Meeting link
+  1956→- Location
+  1957→- Agenda
+  1958→
+  1959→The intern receives the appointment.
+  1960→
+  1961→Calendar should show it.
+  1962→
+  1963→---
+  1964→
+  1965→# 46. REVIEW NOTIFICATION FLOW
+  1966→
+  1967→Implement this exact notification chain:
+  1968→
+  1969→```text
+  1970→Intern submits task
+  1971→        ↓
+  1972→Reviewer notification
+  1973→        ↓
+  1974→Reviewer opens submission
+  1975→        ↓
+  1976→Reviewer chooses "Schedule Review"
+  1977→        ↓
+  1978→Review appointment created
+  1979→        ↓
+  1980→Intern notification
+  1981→        ↓
+  1982→Reviewer notification
+  1983→        ↓
+  1984→Calendar event
+  1985→        ↓
+  1986→Reminder before review
+  1987→        ↓
+  1988→Review
+  1989→        ↓
+  1990→Score + feedback
+  1991→        ↓
+  1992→Intern notification
+  1993→        ↓
+  1994→Progress updated
+  1995→```
+  1996→
+  1997→Every step should use Firebase data.
+  1998→
+  1999→---
+  2000→
+
+[showing lines 1-2000 of 2389; use offset=2001 with limit to continue reading]

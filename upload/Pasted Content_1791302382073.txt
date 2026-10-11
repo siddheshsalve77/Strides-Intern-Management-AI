@@ -1,0 +1,2389 @@
+do this in one go evrything :
+# URGENT UI/UX BUG FIX — LAYOUT, OVERLAY & INDEPENDENT SCROLLING
+
+Inspect the current STRIDES ONE application and fix the layout shown in the current preview.
+
+I have attached a screenshot showing the problem.
+
+## 1. CURRENT PROBLEM
+
+The current page has a serious layout/scrolling issue:
+
+- The main content area is partially blank/washed out.
+- Some content appears to be hidden behind an unwanted overlay/layer.
+- The left sidebar and main content are not behaving as two clean independent areas.
+- The page appears to have conflicting height/overflow behavior.
+- The footer is appearing in an incorrect position.
+- The sidebar appears to extend/behave incorrectly when scrolling.
+- The main content does not have a clean independent vertical scroll.
+- The overall application feels like the sidebar, header and content are fighting each other for scroll position.
+
+Fix the ROOT CAUSE instead of adding visual hacks.
+
+---
+
+# 2. REQUIRED FINAL LAYOUT
+
+The application should behave like a professional enterprise/MNC dashboard.
+
+Use this structure:
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│                     TOP HEADER / TOP BAR                     │
+├───────────────┬──────────────────────────────────────────────┤
+│               │                                              │
+│               │                                              │
+│   SIDEBAR     │             MAIN CONTENT                     │
+│               │                                              │
+│   independent │             independent                     │
+│   scrolling   │             scrolling                       │
+│               │                                              │
+│               │                                              │
+│               │                                              │
+└───────────────┴──────────────────────────────────────────────┘
+```
+
+The sidebar and main content must behave as separate scroll containers.
+
+---
+
+# 3. SIDEBAR SCROLLING
+
+The left sidebar must:
+
+- Stay fixed/sticky on desktop.
+- Occupy the full available viewport height.
+- Have its OWN vertical scrollbar when its menu becomes longer than the viewport.
+- NOT move when the main content scrolls.
+- NOT cause the main content to scroll.
+- NOT expand the overall document height unnecessarily.
+- Keep its own scroll position.
+
+For desktop:
+
+```css
+height: 100vh;
+overflow-y: auto;
+overflow-x: hidden;
+```
+
+Use the actual project's architecture and Tailwind/classes rather than blindly copying this CSS.
+
+The sidebar should remain visually stable while the right side scrolls.
+
+---
+
+# 4. MAIN CONTENT SCROLLING
+
+The main application area must have its OWN vertical scroll.
+
+The main content should:
+
+- Occupy the remaining viewport width.
+- Occupy the available viewport height.
+- Scroll vertically independently.
+- NOT move the sidebar.
+- NOT cause the entire browser page to scroll unnecessarily.
+- Preserve the header position where appropriate.
+
+The layout should effectively use:
+
+```text
+Viewport
+  └── Application Shell
+       ├── Sidebar
+       │    └── independent scroll
+       │
+       └── Main Area
+            ├── Header
+            └── Page Content
+                 └── independent scroll
+```
+
+---
+
+# 5. FIX THE ROOT HEIGHT/OVERFLOW ARCHITECTURE
+
+Inspect the entire component hierarchy for:
+
+- `height: 100%`
+- `min-height`
+- `100vh`
+- `100dvh`
+- `overflow`
+- `overflow-y`
+- `position: fixed`
+- `position: sticky`
+- flex containers
+- grid containers
+- nested scroll containers
+
+The most common cause of this type of bug is missing:
+
+```css
+min-height: 0;
+```
+
+on flex/grid children that are supposed to scroll.
+
+Correct the layout architecture rather than applying random `overflow-hidden` values.
+
+Do NOT simply put:
+
+```css
+overflow: hidden;
+```
+
+everywhere to hide the problem.
+
+---
+
+# 6. TOP HEADER
+
+The top header should remain stable while the main page content scrolls.
+
+On desktop:
+
+- Sidebar stays fixed.
+- Header stays at the top of the application content.
+- Main page content scrolls underneath/within the content area.
+- No double browser scrollbar should appear.
+
+The header must not overlap page content.
+
+---
+
+# 7. REMOVE UNWANTED OVERLAY / WASHED-OUT SCREEN
+
+The screenshot shows the page content appearing extremely faded/washed out.
+
+Investigate whether this is caused by:
+
+- an invisible modal backdrop
+- `fixed` overlay
+- `absolute` overlay
+- incorrect `z-index`
+- AI assistant backdrop
+- dialog/sheet component
+- drawer backdrop
+- `opacity`
+- `backdrop-filter`
+- `pointer-events`
+- loading overlay
+- transparent full-screen element
+- incorrect portal rendering
+- Radix/shadcn Dialog overlay
+- mobile menu overlay remaining mounted
+- AI Assistant overlay remaining active
+
+Find the actual element causing this.
+
+If there is an overlay that should only appear when a modal/drawer is open, make sure it is rendered ONLY when that component is actually open.
+
+The normal dashboard must NEVER appear dimmed.
+
+Expected normal state:
+
+```text
+Sidebar → normal
+Header → normal
+Page content → normal
+Cards → normal
+Text → normal
+Footer → normal
+```
+
+There should be no invisible overlay covering the application.
+
+---
+
+# 8. AI ASSISTANT
+
+The screenshot shows the AI Assistant widget in the lower-left area.
+
+Inspect this component carefully.
+
+It must NOT:
+
+- create an invisible full-screen overlay when closed
+- block clicks on the sidebar
+- change the opacity of the entire application
+- affect scrolling of the sidebar
+- affect scrolling of the main content
+- create an extra body scrollbar
+- create a fixed backdrop when the assistant is not open
+
+When closed, only the small assistant launcher/widget should remain visible.
+
+When opened:
+
+- The assistant panel may be fixed.
+- It should have its own internal scroll.
+- It must not disable normal application scrolling unless intentionally designed as a modal.
+- Closing it must immediately remove its backdrop/overlay.
+
+---
+
+# 9. FOOTER
+
+The footer currently appears in an incorrect position because the page/layout height is probably being calculated incorrectly.
+
+Fix it.
+
+The footer should appear naturally at the bottom of the relevant page content.
+
+It should NOT:
+
+- float in the middle of the viewport
+- remain visible over content
+- cause an unnecessary global scrollbar
+- appear immediately after a tiny amount of content when the page itself should fill the viewport
+
+For short pages, use a proper layout such as:
+
+```text
+Main content
+   ↓
+flex-grow
+   ↓
+Footer
+```
+
+For long pages:
+
+```text
+Main content
+   ↓
+scroll
+   ↓
+Footer at the natural bottom
+```
+
+---
+
+# 10. NO DOUBLE SCROLLBARS
+
+After fixing the layout, check the entire application.
+
+There should NOT be:
+
+- browser scrollbar + duplicate main scrollbar
+- sidebar scrollbar + unexpected body scrollbar
+- horizontal scrollbar
+- nested unnecessary scrollbars
+
+The intended desktop behavior is:
+
+### Sidebar
+
+```text
+OWN vertical scroll
+```
+
+### Main content
+
+```text
+OWN vertical scroll
+```
+
+### Browser body
+
+```text
+NO unnecessary page-level scroll
+```
+
+---
+
+# 11. HORIZONTAL OVERFLOW
+
+Fix any horizontal overflow.
+
+The application should never produce an unexpected horizontal scrollbar because of:
+
+- wide tables
+- cards
+- sidebar width
+- fixed elements
+- charts
+- AI assistant
+- padding
+- long text
+- responsive components
+
+Use responsive containers and appropriate `min-width: 0`.
+
+For tables, use horizontal scrolling INSIDE the table container if necessary.
+
+---
+
+# 12. RESPONSIVE BEHAVIOR
+
+Do not break mobile/tablet behavior while fixing desktop.
+
+### Desktop
+
+```text
+Sidebar visible
+Main content beside sidebar
+Independent scrolling
+```
+
+### Tablet
+
+Use the existing responsive navigation behavior.
+
+### Mobile
+
+Sidebar should become a drawer/mobile navigation where appropriate.
+
+When mobile drawer is closed:
+
+- No overlay
+- No scroll blocking
+- No invisible backdrop
+
+When mobile drawer is open:
+
+- Overlay is intentional
+- Background interaction is disabled appropriately
+- Closing the drawer removes the overlay completely
+
+---
+
+# 13. PAGE ROUTING
+
+Check whether the problem occurs because pages are being rendered inside another scrolling container.
+
+Review:
+
+- App shell
+- Layout
+- Sidebar
+- Header
+- Router
+- Page container
+- Footer
+- AI Assistant
+- Dialogs
+- Drawers
+- Modals
+
+Make sure there is one consistent application shell.
+
+Do not create a separate `100vh`/scroll container for every page.
+
+---
+
+# 14. FIX ALL PAGES, NOT JUST "MY TASKS"
+
+The fix must apply globally.
+
+Test:
+
+- Dashboard
+- My Tasks
+- Task Details
+- Attendance
+- Leave
+- Calendar
+- Projects
+- Performance
+- Goals
+- Learning
+- Documents
+- Service Requests
+- Expenses
+- My Assets
+- Onboarding
+- Directory
+- Announcements
+- Notifications
+- AI Assistant
+- My Profile
+- HR pages
+- Manager pages
+- Admin pages
+
+Every page must use the same stable application shell.
+
+---
+
+# 15. DO NOT DESTROY THE EXISTING DESIGN
+
+This is a BUG FIX.
+
+Do NOT:
+
+- redesign the application
+- replace the sidebar
+- replace the header
+- change the visual theme
+- remove existing modules
+- simplify the UI
+- create a generic dashboard
+- change the Stitch-approved design
+
+Only fix the structural/layout/scrolling problems.
+
+Preserve:
+
+- typography
+- spacing
+- colors
+- icons
+- cards
+- navigation
+- animations
+- responsive behavior
+- existing UX
+
+---
+
+# 16. DEBUG PROPERLY
+
+Before making changes:
+
+1. Inspect the application shell.
+2. Inspect the root layout.
+3. Inspect sidebar implementation.
+4. Inspect header implementation.
+5. Inspect page container.
+6. Inspect footer.
+7. Inspect AI Assistant.
+8. Inspect all fixed/sticky elements.
+9. Inspect overlays/dialogs/drawers.
+10. Inspect global CSS.
+11. Inspect Tailwind classes.
+12. Find the element causing the washed-out screen.
+
+Do not guess.
+
+Identify the actual CSS/layout conflict.
+
+---
+
+# 17. FINAL ACCEPTANCE TEST
+
+After fixing, verify:
+
+### Test 1 — Sidebar
+
+Scroll the main content down.
+
+Expected:
+
+```text
+Sidebar does NOT move.
+```
+
+### Test 2 — Main content
+
+Scroll the sidebar down.
+
+Expected:
+
+```text
+Main content does NOT move.
+```
+
+### Test 3 — Long sidebar
+
+Open enough navigation items to exceed viewport height.
+
+Expected:
+
+```text
+Sidebar gets its own scrollbar.
+```
+
+### Test 4 — Long page
+
+Open a page with lots of content.
+
+Expected:
+
+```text
+Main content gets its own scrollbar.
+```
+
+### Test 5 — AI Assistant closed
+
+Expected:
+
+```text
+No overlay.
+No dimming.
+No blocked clicks.
+No scrolling problems.
+```
+
+### Test 6 — AI Assistant open
+
+Expected:
+
+```text
+Assistant works normally.
+Assistant has its own internal scroll.
+Application layout remains stable.
+```
+
+### Test 7 — Footer
+
+Expected:
+
+```text
+Footer is positioned naturally.
+No floating footer.
+No overlap.
+```
+
+### Test 8 — Browser
+
+Expected:
+
+```text
+No unnecessary global browser scrollbar.
+No horizontal scrollbar.
+```
+
+### Test 9 — Navigation
+
+Navigate between every major page.
+
+Expected:
+
+```text
+Same application shell.
+Same sidebar behavior.
+Same header behavior.
+Same scrolling architecture.
+```
+
+---
+
+# 18. IMPORTANT
+
+Do not tell me the issue is fixed just because the page renders.
+
+Actually test the scrolling behavior and inspect the DOM/CSS.
+
+The final application must feel like a **professional enterprise SaaS/MNC employee portal**, where:
+
+**Sidebar = independent navigation container**
+
+**Header = stable application header**
+
+**Main content = independent scroll container**
+
+**AI Assistant = independent component**
+
+**Footer = natural page content**
+
+**Browser body = no unnecessary scrolling**
+
+Fix the root cause and then verify the entire application before finishing.
+# STRIDES ONE — ADVANCED TASK SUBMISSION, REVIEW SCHEDULING & INTERN MANAGEMENT
+
+The current STRIDES ONE application is already developed.
+
+Now significantly upgrade the existing system into a **production-quality enterprise Intern + Employee Management Platform**.
+
+Do NOT rebuild the application from scratch.
+
+Do NOT replace the existing UI/design.
+
+Keep the existing Stitch-approved visual language, sidebar, header, cards, typography, spacing, navigation, colors, icons and responsive design.
+
+This upgrade should focus on making the workflows **real, connected, automated and efficient**, especially for:
+
+- Intern batch management
+- Intern onboarding
+- Task assignment
+- Professional task submission
+- Submission notifications
+- Review scheduling
+- Manager/Admin review
+- Review reminders
+- Review feedback
+- Resubmission
+- Intern progress
+- Internship completion
+- Firebase synchronization
+- Application scrolling/layout
+
+---
+
+# 1. CORE WORKFLOW
+
+The most important new workflow is:
+
+```text
+TASK CREATED
+      ↓
+TASK ASSIGNED
+      ↓
+INTERN WORKS ON TASK
+      ↓
+SAVE DRAFT
+      ↓
+FINAL SUBMISSION
+      ↓
+MANAGER / ADMIN NOTIFIED
+      ↓
+REVIEW REQUEST CREATED
+      ↓
+MANAGER / ADMIN SCHEDULES REVIEW
+      ↓
+INTERN NOTIFIED OF REVIEW SCHEDULE
+      ↓
+REVIEW SESSION / REVIEW WINDOW
+      ↓
+MANAGER / ADMIN REVIEWS SUBMISSION
+      ↓
+AI ASSISTED REVIEW
+      ↓
+HUMAN FINAL REVIEW
+      ↓
+SCORE + FEEDBACK
+      ↓
+APPROVED
+       OR
+CHANGES REQUESTED
+      ↓
+RESUBMISSION IF REQUIRED
+      ↓
+FINAL APPROVAL
+      ↓
+TASK COMPLETED
+      ↓
+INTERN PROGRESS UPDATED
+```
+
+This entire lifecycle must be implemented using Firebase-backed data.
+
+---
+
+# 2. TASK SUBMISSION MUST BE A PROFESSIONAL WORKSPACE
+
+Do NOT use a basic:
+
+```text
+Upload File
+Submit
+```
+
+interface.
+
+Create a dedicated **Task Submission Workspace**.
+
+When an intern opens a task, show:
+
+## Task Header
+
+- Task title
+- Project
+- Priority
+- Assigned by
+- Deadline
+- Time remaining
+- Status
+- Review status
+
+Example:
+
+```text
+ETL Pipeline Implementation
+
+Assigned by:
+Rahul Sharma
+
+Deadline:
+12 Oct 2026 · 6:00 PM
+
+Status:
+In Progress
+
+Review:
+Not Submitted
+```
+
+---
+
+# 3. TASK REQUIREMENTS
+
+Every task should clearly display:
+
+### Objective
+
+What the intern needs to accomplish.
+
+### Requirements
+
+A checklist of required deliverables.
+
+Example:
+
+```text
+☑ Python ETL script
+☑ SQL queries
+☑ README
+☑ Data validation
+☐ Final explanation
+```
+
+### Expected Output
+
+Clearly describe what the manager expects.
+
+### Evaluation Criteria
+
+Show the intern how the task will be evaluated.
+
+Example:
+
+```text
+Code Quality       20
+Correctness        30
+Documentation      15
+Problem Solving    20
+Completeness       15
+```
+
+This makes the review process transparent.
+
+---
+
+# 4. SAVE DRAFT
+
+Interns must be able to save their submission as a draft.
+
+Draft should preserve:
+
+- Text explanation
+- Links
+- Uploaded files
+- Notes
+- Checklist progress
+
+Show:
+
+```text
+Draft saved 2 minutes ago
+```
+
+Auto-save where appropriate.
+
+Do not lose work if the page is refreshed.
+
+---
+
+# 5. SUBMISSION TYPES
+
+Support multiple submission methods.
+
+### File
+
+- PDF
+- DOCX
+- XLSX
+- ZIP
+- Images
+- Code files
+
+### Links
+
+- GitHub
+- GitLab
+- Google Drive
+- Demo URL
+- Project URL
+
+### Written response
+
+Rich text explanation.
+
+### Multiple submission types
+
+A task can require:
+
+```text
+File + GitHub + Explanation
+```
+
+---
+
+# 6. DRAG & DROP FILE UPLOAD
+
+Create a professional upload area:
+
+```text
+┌─────────────────────────────────────────┐
+│                                         │
+│       Drag & drop files here            │
+│                                         │
+│       or                                │
+│       Browse files                      │
+│                                         │
+│       Max file size: configurable       │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+Show upload progress.
+
+Show:
+
+- filename
+- file type
+- size
+- upload status
+- remove option
+- preview where possible
+
+Use Firebase Storage.
+
+---
+
+# 7. SUBMISSION VALIDATION
+
+Before final submission:
+
+Validate:
+
+- Required files
+- Required links
+- Required explanation
+- Required checklist items
+- File size
+- Supported file types
+- Deadline
+
+If something is missing:
+
+```text
+You still need to complete:
+
+• README file
+• Project explanation
+```
+
+Do not allow incomplete final submission if the task requires those fields.
+
+---
+
+# 8. FINAL SUBMISSION CONFIRMATION
+
+Before submission show:
+
+```text
+Ready to submit?
+
+Task:
+ETL Pipeline Implementation
+
+Files:
+3
+
+Links:
+1
+
+Explanation:
+Completed
+
+Requirements:
+5 / 5 complete
+
+Deadline:
+12 Oct · 6:00 PM
+
+[Back to Edit]     [Submit Final]
+```
+
+After submission:
+
+```text
+Submission successfully received ✓
+
+Your manager has been notified.
+
+You will be notified when your review is scheduled.
+```
+
+---
+
+# 9. SUBMISSION VERSION HISTORY
+
+Never overwrite previous submissions.
+
+Every submission must create a version.
+
+Example:
+
+```text
+Version 1
+8 Oct · 4:20 PM
+Score: 62
+Changes requested
+
+Version 2
+9 Oct · 7:10 PM
+Score: 78
+Changes requested
+
+Version 3
+10 Oct · 3:45 PM
+Score: 91
+Approved
+```
+
+Each version should preserve:
+
+- files
+- links
+- explanation
+- timestamp
+- reviewer
+- score
+- feedback
+- status
+
+---
+
+# 10. SUBMISSION NOTIFICATION
+
+When an intern submits a task:
+
+Automatically generate notification(s).
+
+For the assigned reviewer:
+
+```text
+New Task Submission
+
+Siddhesh Patil submitted:
+
+"ETL Pipeline Implementation"
+
+Submitted:
+6 Oct · 4:42 PM
+
+Deadline:
+6 Oct · 6:00 PM
+
+[Review Submission]
+```
+
+Notify the appropriate:
+
+- Manager
+- Assigned reviewer
+- Authorized Admin
+
+Do NOT notify every employee in the company.
+
+Notification recipients must come from task/reviewer assignments.
+
+---
+
+# 11. REVIEW REQUEST
+
+After submission, automatically create a **Review Request**.
+
+Review request should contain:
+
+- Task ID
+- Submission ID
+- Intern ID
+- Reviewer ID
+- Submission timestamp
+- Deadline
+- Priority
+- Suggested review duration
+- Status
+
+Example:
+
+```text
+Review Request
+
+Intern:
+Siddhesh Patil
+
+Task:
+ETL Pipeline
+
+Status:
+Awaiting Review
+
+Suggested Review Time:
+15 minutes
+
+Priority:
+High
+```
+
+---
+
+# 12. REVIEW CENTER
+
+Create a dedicated **Review Center** for Managers/Admins.
+
+This should become the main workspace for reviewing submissions.
+
+Dashboard:
+
+```text
+REVIEW CENTER
+
+Pending Reviews       8
+Scheduled Reviews     3
+Overdue Reviews       2
+Completed Today       6
+
+--------------------------------
+
+Needs Action
+
+🔴 2 overdue
+🟠 3 due today
+🟡 3 scheduled
+```
+
+Managers should not need to search through different pages.
+
+Everything requiring review should appear here.
+
+---
+
+# 13. REVIEW SCHEDULING
+
+This is a key feature.
+
+After receiving a submission, the Manager/Admin can choose:
+
+### Review Now
+
+Immediately review the task.
+
+### Schedule Review
+
+Select:
+
+- Date
+- Time
+- Estimated duration
+- Reviewer
+- Optional meeting/link
+- Notes
+
+Example:
+
+```text
+Schedule Review
+
+Intern:
+Siddhesh Patil
+
+Task:
+ETL Pipeline
+
+Date:
+8 Oct 2026
+
+Time:
+3:30 PM
+
+Duration:
+20 minutes
+
+Reviewer:
+Rahul Sharma
+
+Meeting:
+Optional
+
+[Schedule Review]
+```
+
+---
+
+# 14. REVIEW SCHEDULE NOTIFICATION
+
+Once the review is scheduled:
+
+Automatically notify the intern.
+
+Example:
+
+```text
+Review Scheduled
+
+Your task review has been scheduled.
+
+Task:
+ETL Pipeline Implementation
+
+Reviewer:
+Rahul Sharma
+
+Date:
+8 Oct 2026
+
+Time:
+3:30 PM
+
+Duration:
+20 minutes
+
+[View Task]   [View Review]
+```
+
+Also notify the reviewer.
+
+---
+
+# 15. REVIEW CALENDAR
+
+Add review events to the appropriate calendars.
+
+### Intern Calendar
+
+Shows:
+
+- Review date
+- Reviewer
+- Task
+- Time
+
+### Manager Calendar
+
+Shows:
+
+- Pending reviews
+- Scheduled reviews
+- Team meetings
+
+### HR Calendar
+
+Only show appropriate organization-level information.
+
+---
+
+# 16. REVIEW REMINDERS
+
+Automatically notify:
+
+### Intern
+
+Example:
+
+```text
+Your ETL Pipeline review starts in 1 hour.
+```
+
+### Reviewer
+
+Example:
+
+```text
+Your review with Siddhesh starts in 1 hour.
+```
+
+Use configurable reminder intervals.
+
+Example:
+
+```text
+24 hours before
+1 hour before
+15 minutes before
+```
+
+Do not spam users.
+
+---
+
+# 17. REVIEW RESCHEDULING
+
+Managers should be able to reschedule a review.
+
+If rescheduled:
+
+1. Update Firebase.
+2. Notify the intern.
+3. Notify reviewer.
+4. Update calendar.
+5. Record the change in audit log.
+
+Example:
+
+```text
+Review rescheduled
+
+Previous:
+3:30 PM
+
+New:
+5:00 PM
+
+Reason:
+Reviewer unavailable
+```
+
+---
+
+# 18. REVIEW CANCELLATION
+
+Authorized reviewers can cancel a scheduled review.
+
+Require a reason.
+
+Notify the intern.
+
+Example:
+
+```text
+Your review scheduled for 3:30 PM has been cancelled.
+
+Reason:
+Manager unavailable.
+
+A new review time will be scheduled shortly.
+```
+
+---
+
+# 19. QUICK REVIEW MODE
+
+Managers are busy.
+
+Create a fast review interface.
+
+Do NOT force them to navigate through multiple pages.
+
+Use a layout like:
+
+```text
+┌─────────────────────────────────────────────────────────┐
+│ Review: ETL Pipeline                    1 of 8          │
+├───────────────────────┬─────────────────────────────────┤
+│ Intern                │ Evaluation                      │
+│                       │                                 │
+│ Siddhesh Patil        │ Code Quality        /20         │
+│                       │ Correctness         /30         │
+│ Submission            │ Documentation       /15         │
+│                       │ Problem Solving     /20         │
+│ Files                 │ Completeness        /15         │
+│ GitHub                │                                 │
+│ Explanation           │ Final Score         /100        │
+│                       │                                 │
+│ AI Summary            │ Feedback                        │
+│                       │ [.........................]     │
+│                       │                                 │
+│                       │ [Request Changes] [Approve]     │
+└───────────────────────┴─────────────────────────────────┘
+```
+
+---
+
+# 20. "NEXT REVIEW" BUTTON
+
+After a manager submits a review:
+
+Show:
+
+```text
+Review submitted successfully ✓
+
+7 reviews remaining
+
+[Review Next]
+```
+
+Clicking **Review Next** should immediately open the next prioritized review.
+
+This is extremely important for saving manager time.
+
+---
+
+# 21. REVIEW QUEUE PRIORITIZATION
+
+Automatically order reviews based on:
+
+1. Overdue review
+2. Deadline approaching
+3. High-priority task
+4. Scheduled review
+5. Oldest submission
+
+Example:
+
+```text
+🔴 Overdue
+🟠 Due today
+🟡 Scheduled
+🟢 Normal
+```
+
+Managers can still manually filter.
+
+---
+
+# 22. REVIEW TEMPLATES
+
+Managers should be able to create reusable feedback templates.
+
+Examples:
+
+```text
+Good implementation.
+
+Please improve the documentation.
+
+Please add error handling.
+
+Please include additional test cases.
+
+The overall approach is correct but needs optimization.
+```
+
+Allow:
+
+**Insert Feedback Template**
+
+Then manager can modify it before submission.
+
+This saves time.
+
+---
+
+# 23. AI REVIEW ASSISTANT
+
+When a task is submitted, AI can prepare a preliminary review.
+
+Example:
+
+```text
+AI REVIEW SUMMARY
+
+Overall:
+Strong submission
+
+Strengths:
+• Clean implementation
+• Good structure
+• Correct output
+
+Potential Issues:
+• Documentation incomplete
+• Error handling limited
+
+Suggested Score:
+84/100
+
+Estimated Review Time:
+8 minutes
+```
+
+The manager must make the final decision.
+
+AI cannot automatically approve a submission.
+
+---
+
+# 24. AI SHOULD SAVE REVIEWER TIME
+
+AI should help summarize:
+
+- Submission
+- Files
+- GitHub/project content where permitted
+- Written explanation
+- Previous feedback
+- Changes between versions
+
+For resubmission:
+
+```text
+Changes Since Previous Version
+
+✓ Added error handling
+✓ Improved README
+✓ Added validation
+
+Still needs attention:
+• Test coverage
+```
+
+This allows the reviewer to focus on important issues.
+
+---
+
+# 25. REVIEW RUBRIC
+
+Every task can define its own evaluation rubric.
+
+Example:
+
+```text
+Technical Correctness      30
+Code Quality               20
+Problem Solving            20
+Documentation              15
+Completeness               15
+TOTAL                     100
+```
+
+Different task templates can have different rubrics.
+
+---
+
+# 26. REQUEST CHANGES
+
+If the task is not ready:
+
+Manager clicks:
+
+**Request Changes**
+
+Require:
+
+- Feedback
+- Required changes
+- Optional deadline
+
+Then:
+
+```text
+Task Status:
+Changes Requested
+```
+
+Intern receives notification.
+
+---
+
+# 27. RESUBMISSION WORKFLOW
+
+Intern sees:
+
+```text
+Changes Requested
+
+Reviewer:
+Rahul Sharma
+
+Required Changes:
+
+1. Add validation
+2. Improve documentation
+3. Fix SQL query
+
+[Create New Submission]
+```
+
+The intern submits Version 2.
+
+The reviewer sees the previous review beside the new submission.
+
+---
+
+# 28. REVIEW COMPARISON
+
+For resubmissions provide:
+
+```text
+Version 1          Version 2
+
+Score: 64          Score: 82
+
+Issues:
+3                  1
+
+Documentation:
+Incomplete         Complete
+
+Validation:
+Missing            Added
+```
+
+AI can summarize the differences.
+
+---
+
+# 29. FINAL APPROVAL
+
+Reviewer chooses:
+
+### Approve
+
+Task becomes:
+
+```text
+COMPLETED
+```
+
+### Request Changes
+
+Task becomes:
+
+```text
+CHANGES REQUESTED
+```
+
+### Reject
+
+Only where appropriate and require a reason.
+
+---
+
+# 30. INTERN PROGRESS AUTOMATICALLY UPDATES
+
+When task is approved:
+
+Automatically update:
+
+- Task completion
+- Batch progress
+- Intern progress
+- Project progress
+- Performance metrics
+- Completion percentage
+
+Do not manually update these values.
+
+Calculate them from Firebase data.
+
+---
+
+# 31. INTERN BATCH MANAGEMENT
+
+Create a dedicated HR **Batch Management Center**.
+
+HR should see:
+
+```text
+Intern Batches
+
+Summer 2026
+24 Interns
+82% Average Progress
+94% Attendance
+7 Pending Reviews
+
+Winter 2026
+18 Interns
+61% Average Progress
+91% Attendance
+12 Pending Reviews
+```
+
+---
+
+# 32. BATCH CREATION WIZARD
+
+Create a guided batch setup.
+
+### Step 1
+
+Batch information
+
+- Batch name
+- Program
+- Department
+- Start date
+- End date
+- Capacity
+
+### Step 2
+
+Management
+
+- Manager
+- Mentors
+- HR owner
+
+### Step 3
+
+Onboarding template
+
+Choose:
+
+- Standard onboarding
+- Data internship onboarding
+- Software development onboarding
+- Custom onboarding
+
+### Step 4
+
+Task template
+
+Choose standard tasks.
+
+### Step 5
+
+Review configuration
+
+Configure:
+
+- Review SLA
+- Reminder schedule
+- Evaluation rubric
+
+### Step 6
+
+Confirm
+
+Create batch.
+
+---
+
+# 33. BULK INTERN IMPORT
+
+HR should be able to add multiple interns efficiently.
+
+Support CSV import.
+
+Example columns:
+
+```text
+Name
+Email
+Phone
+Department
+Designation
+Manager
+Batch
+Start Date
+End Date
+Role
+```
+
+Before importing:
+
+Show validation preview.
+
+Example:
+
+```text
+25 records found
+
+23 valid
+2 errors
+
+Row 14:
+Invalid email
+
+Row 19:
+Manager not found
+```
+
+Do not create accounts until HR confirms the import.
+
+---
+
+# 34. BULK ACTIONS
+
+HR can select multiple interns:
+
+```text
+☑ Intern A
+☑ Intern B
+☑ Intern C
+```
+
+Allowed actions:
+
+- Assign batch
+- Assign manager
+- Assign mentor
+- Send onboarding reminder
+- Activate
+- Deactivate where authorized
+
+All bulk actions must be audited.
+
+---
+
+# 35. ONBOARDING CENTER
+
+HR should have an onboarding dashboard.
+
+Show:
+
+```text
+ONBOARDING
+
+24 Interns
+
+Completed             16
+In Progress             6
+Not Started             2
+
+Average completion:
+87%
+```
+
+Filter by:
+
+- Batch
+- Department
+- Manager
+- Status
+
+---
+
+# 36. PERSONALIZED ONBOARDING FOR INTERN
+
+Intern sees:
+
+```text
+Welcome to Strides Software 👋
+
+Your onboarding
+
+████████████░░ 80%
+
+6 of 8 completed
+
+Next:
+Complete Security Training
+
+Due:
+Tomorrow
+```
+
+Make it feel like a guided journey.
+
+---
+
+# 37. ONBOARDING CHECKLIST
+
+Include:
+
+- Personal profile
+- Contact information
+- Documents
+- Policies
+- NDA
+- Security training
+- Team introduction
+- Manager introduction
+- Technical setup
+- First task
+
+HR can configure checklist items.
+
+---
+
+# 38. ONBOARDING AUTOMATION
+
+When HR activates an intern:
+
+Automatically:
+
+```text
+Create account
+↓
+Assign batch
+↓
+Assign manager
+↓
+Assign mentor
+↓
+Generate onboarding checklist
+↓
+Create notifications
+↓
+Assign standard tasks
+↓
+Add calendar events
+```
+
+---
+
+# 39. BATCH ANALYTICS
+
+Show:
+
+- Total interns
+- Active
+- Completed
+- At-risk
+- Average attendance
+- Task completion
+- Average score
+- Review turnaround
+- Onboarding completion
+- Final completion rate
+
+---
+
+# 40. AT-RISK INTERN DETECTION
+
+Identify interns requiring attention.
+
+Signals:
+
+- Low attendance
+- Overdue tasks
+- Low scores
+- Multiple changes requested
+- No recent activity
+- Incomplete onboarding
+- Missed review
+
+Show:
+
+```text
+⚠ Attention Required
+
+Siddhesh Patil
+
+Reason:
+2 overdue tasks
+1 pending review
+Attendance below threshold
+
+Suggested action:
+Manager check-in
+```
+
+AI can summarize but must NOT make employment decisions.
+
+---
+
+# 41. MANAGER ACTION CENTER
+
+Manager's homepage should prioritize actions.
+
+Example:
+
+```text
+NEEDS YOUR ATTENTION
+
+🔴 2 overdue reviews
+🟠 3 submissions awaiting scheduling
+🟡 2 reviews today
+🟢 5 tasks due this week
+
+[Open Review Center]
+```
+
+The goal is to reduce administrative work.
+
+---
+
+# 42. REVIEW SLA
+
+Allow HR/Admin to configure expected review time.
+
+Example:
+
+```text
+Normal:
+24 hours
+
+High priority:
+8 hours
+
+Urgent:
+4 hours
+```
+
+If reviewer does not act within SLA:
+
+```text
+Reminder
+↓
+Escalation
+↓
+HR notification
+```
+
+Make the workflow configurable.
+
+---
+
+# 43. REVIEW TURNAROUND ANALYTICS
+
+Track:
+
+- Average review time
+- Pending review count
+- Overdue reviews
+- Reviews completed per manager
+- SLA compliance
+
+Managers should see their own workload.
+
+HR can see organization-level review metrics where authorized.
+
+---
+
+# 44. MANAGER WORKLOAD BALANCING
+
+Show:
+
+```text
+Reviewer Workload
+
+Rahul Sharma
+8 pending reviews
+
+Amit Joshi
+3 pending reviews
+
+Priya Shah
+11 pending reviews
+```
+
+When assigning a reviewer, optionally show workload.
+
+Do not automatically reassign without authorization.
+
+---
+
+# 45. TASK REVIEW APPOINTMENT / SLOT SYSTEM
+
+For tasks requiring a live discussion, allow the reviewer to define:
+
+- Date
+- Time
+- Duration
+- Meeting link
+- Location
+- Agenda
+
+The intern receives the appointment.
+
+Calendar should show it.
+
+---
+
+# 46. REVIEW NOTIFICATION FLOW
+
+Implement this exact notification chain:
+
+```text
+Intern submits task
+        ↓
+Reviewer notification
+        ↓
+Reviewer opens submission
+        ↓
+Reviewer chooses "Schedule Review"
+        ↓
+Review appointment created
+        ↓
+Intern notification
+        ↓
+Reviewer notification
+        ↓
+Calendar event
+        ↓
+Reminder before review
+        ↓
+Review
+        ↓
+Score + feedback
+        ↓
+Intern notification
+        ↓
+Progress updated
+```
+
+Every step should use Firebase data.
+
+---
+
+# 47. FIREBASE REAL-TIME SYNCHRONIZATION
+
+Changes must synchronize across the system.
+
+Example:
+
+Intern submits:
+
+→ Reviewer Review Center updates
+
+→ Reviewer notification appears
+
+→ Task status changes
+
+→ Intern sees "Under Review"
+
+Reviewer schedules:
+
+→ Intern calendar updates
+
+→ Intern notification appears
+
+Reviewer submits score:
+
+→ Intern dashboard updates
+
+→ Task becomes completed or changes requested
+
+→ Batch analytics update
+
+→ Performance data updates
+
+No manual refresh should be required where real-time listeners are appropriate.
+
+---
+
+# 48. FIREBASE COLLECTIONS
+
+Extend the database appropriately.
+
+Suggested collections:
+
+```text
+users
+employees
+interns
+internBatches
+onboardingTemplates
+onboardingTasks
+taskTemplates
+tasks
+taskSubmissions
+submissionVersions
+reviewRequests
+reviewSchedules
+taskReviews
+reviewTemplates
+reviewRubrics
+performanceReviews
+notifications
+calendarEvents
+projects
+attendance
+leaveRequests
+documents
+auditLogs
+```
+
+Use IDs/references consistently.
+
+Avoid duplicate source-of-truth data.
+
+---
+
+# 49. NOTIFICATION CENTER
+
+Create a proper notification center.
+
+Categories:
+
+- Tasks
+- Reviews
+- Leave
+- Attendance
+- Onboarding
+- HR
+- Announcements
+- System
+
+Support:
+
+- Read/unread
+- Mark all read
+- Filter
+- Open related item
+- Timestamp
+
+---
+
+# 50. GLOBAL SEARCH
+
+Allow users to search things they are authorized to see:
+
+- Intern
+- Employee
+- Batch
+- Task
+- Submission
+- Review
+- Project
+- Document
+
+---
+
+# 51. AUDIT LOGGING
+
+Record important events:
+
+- Submission
+- Resubmission
+- Review scheduling
+- Review rescheduling
+- Review cancellation
+- Score change
+- Feedback
+- Task approval
+- Batch creation
+- Intern assignment
+- Manager assignment
+- Onboarding changes
+
+Store:
+
+- actor
+- timestamp
+- action
+- target
+- previous value
+- new value where appropriate
+
+---
+
+# 52. SCROLLING / LAYOUT FIX — MUST BE IMPLEMENTED
+
+Also fix the current scrolling issue visible in the application screenshot.
+
+The application currently has incorrect scrolling and a washed-out/overlay appearance.
+
+The final layout must use:
+
+```text
+┌─────────────────────────────────────────────────────┐
+│                    APPLICATION                      │
+│                                                     │
+│ ┌───────────────┐ ┌───────────────────────────────┐ │
+│ │               │ │ Header                        │ │
+│ │   SIDEBAR     │ ├───────────────────────────────┤ │
+│ │               │ │                               │ │
+│ │ independent  │ │     MAIN CONTENT              │ │
+│ │ scroll        │ │                               │ │
+│ │               │ │ independent scroll            │ │
+│ │               │ │                               │ │
+│ └───────────────┘ └───────────────────────────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+# 53. SIDEBAR SCROLLING
+
+Desktop sidebar must:
+
+- Remain fixed/sticky
+- Fill available viewport height
+- Have its own vertical scroll
+- Not move when main content scrolls
+- Maintain its own scroll position
+- Not create page-level overflow
+
+Use proper:
+
+```text
+height: 100dvh
+overflow-y: auto
+```
+
+where appropriate.
+
+Ensure flex children use:
+
+```text
+min-height: 0
+```
+
+where required.
+
+---
+
+# 54. MAIN CONTENT SCROLLING
+
+Main content must:
+
+- Occupy remaining width
+- Occupy available height
+- Scroll vertically independently
+- Not move sidebar
+- Not create unnecessary browser scrolling
+
+Do not use random nested `overflow-hidden` rules to hide the issue.
+
+Fix the layout architecture.
+
+---
+
+# 55. FIX THE WASHED-OUT SCREEN
+
+The current screenshot shows the application content appearing faded.
+
+Inspect:
+
+- Dialog overlays
+- Drawer overlays
+- AI Assistant
+- Mobile navigation backdrop
+- `opacity`
+- `backdrop-filter`
+- `z-index`
+- fixed elements
+- loading overlays
+- portal components
+- pointer events
+
+Find the exact element causing the problem.
+
+Normal dashboard must be fully visible and interactive.
+
+---
+
+# 56. AI ASSISTANT MUST NOT BREAK THE APP
+
+When closed:
+
+- No overlay
+- No backdrop
+- No opacity
+- No scroll lock
+- No blocked interaction
+
+When open:
+
+- Assistant has its own scroll
+- Application remains stable
+- Sidebar continues working
+- Main content continues working
+- Closing removes all overlay effects
+
+---
+
+# 57. NO DOUBLE SCROLLBAR
+
+Final application must not have unnecessary:
+
+- Browser scrollbar
+- Main content duplicate scrollbar
+- Sidebar duplicate scrollbar
+- Horizontal scrollbar
+
+Only intentional scroll containers should scroll.
+
+---
+
+# 58. RESPONSIVE
+
+Desktop:
+
+Sidebar + main content.
+
+Tablet:
+
+Responsive navigation.
+
+Mobile:
+
+Sidebar becomes a drawer.
+
+Drawer:
+
+- Own scroll
+- Proper backdrop
+- No invisible overlay when closed
+- Proper body scroll handling
+
+---
+
+# 59. DO NOT CHANGE EXISTING DESIGN
+
+This is a functionality and architecture upgrade.
+
+Do NOT:
+
+- redesign the entire portal
+- replace the Stitch design
+- replace sidebar
+- replace header
+- change the brand identity
+- remove existing modules
+
+New functionality must visually match the existing design system.
+
+---
+
+# 60. FINAL END-TO-END TEST
+
+Test this complete scenario:
+
+## Intern
+
+1. Logs in
+2. Completes onboarding
+3. Receives task
+4. Opens task workspace
+5. Saves draft
+6. Uploads files
+7. Adds GitHub link
+8. Completes requirements
+9. Submits task
+10. Receives confirmation
+
+## Reviewer
+
+11. Gets notification
+12. Review request appears
+13. Opens Review Center
+14. Sees AI summary
+15. Chooses Schedule Review
+16. Selects date/time
+17. Intern receives notification
+18. Calendar updates
+19. Reminder is generated
+20. Reviewer opens review
+21. Reviews submission
+22. Gives rubric-based score
+23. Adds feedback
+24. Approves OR requests changes
+25. Clicks Next Review
+
+## Intern
+
+26. Receives review result
+27. Sees score and feedback
+28. If changes requested, sees exact required changes
+29. Creates new submission version
+30. Resubmits
+
+## System
+
+31. Reviewer sees version history
+32. AI compares versions
+33. Reviewer approves
+34. Task becomes completed
+35. Intern progress updates
+36. Batch progress updates
+37. Performance data updates
+38. Analytics update
+39. Audit log records everything
+
+---
+
+# 61. FINAL STANDARD
+
+Do not treat these as independent pages.
+
+Build them as one connected workflow.
+
+The final STRIDES ONE platform should feel like:
+
+**HR + Internship Management + Employee Self Service + Task Management + Review Management + Performance Tracking + AI Assistance**
+
+inside one unified enterprise application.
+
+The most important principle is:
+
+> **Reduce administrative work for managers while giving interns a clear, professional and transparent workflow.**
+
+Every important action should have:
+
+**Action → Firebase → Business Logic → Notification → Related Module Update → Audit Log**
+
+Before declaring this upgrade complete, test the complete workflow with different roles and verify Firebase synchronization, security, notifications, review scheduling, calendar updates, task submissions, versioning, onboarding, batch management and independent scrolling.

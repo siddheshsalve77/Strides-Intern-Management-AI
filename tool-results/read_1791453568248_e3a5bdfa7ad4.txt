@@ -1,0 +1,492 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useState, useEffect } from 'react'
+     4→     4→import { useApp } from '@/lib/store'
+     5→     5→import { Card } from '@/components/ui/card'
+     6→     6→import { Button } from '@/components/ui/button'
+     7→     7→import { Badge } from '@/components/ui/badge'
+     8→     8→import { Progress } from '@/components/ui/progress'
+     9→     9→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+    10→    10→import { greeting, fmtDate, fmtTime, fmtRelative, initials, taskColor, taskLabel, daysUntil } from '@/lib/format'
+    11→    11→import { useTheme } from 'next-themes'
+    12→    12→import type { TaskT, AnnouncementT, NotificationT, AttendanceT, HolidayT, LeaveBalanceT, GoalT, MeetingT } from '@/lib/types'
+    13→    13→import {
+    14→    14→  Clock, CalendarDays, ListChecks, TrendingUp, Play, Square, Megaphone,
+    15→    15→  ArrowRight, Sparkles, Coffee, CheckCircle2, ChevronRight, Calendar,
+    16→    16→} from 'lucide-react'
+    17→    17→import { toast } from 'sonner'
+    18→    18→import { motion } from 'framer-motion'
+    19→    19→import { authedFetch } from '@/lib/firebase-auth'
+    20→    20→
+    21→    21→interface AnalyticsData {
+    22→    22→  attendanceTrend: { date: string; hours: number; status: string; label: string }[]
+    23→    23→  taskDistribution: Record<string, number>
+    24→    24→  avgWeekdayHours: number[]
+    25→    25→  totalTasks?: number
+    26→    26→  completedTasks?: number
+    27→    27→}
+    28→    28→
+    29→    29→export function DashboardView() {
+    30→    30→  const { currentEmployee, setView, dataVersion } = useApp()
+    31→    31→  const { theme } = useTheme()
+    32→    32→  const [tasks, setTasks] = useState<TaskT[]>([])
+    33→    33→  const [announcements, setAnnouncements] = useState<AnnouncementT[]>([])
+    34→    34→  const [notifs, setNotifs] = useState<NotificationT[]>([])
+    35→    35→  const [todayAtt, setTodayAtt] = useState<AttendanceT | null>(null)
+    36→    36→  const [upcomingHolidays, setUpcomingHolidays] = useState<HolidayT[]>([])
+    37→    37→  const [balance, setBalance] = useState<LeaveBalanceT | null>(null)
+    38→    38→  const [goals, setGoals] = useState<GoalT[]>([])
+    39→    39→  const [meetings, setMeetings] = useState<MeetingT[]>([])
+    40→    40→  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+    41→    41→  const [loading, setLoading] = useState(true)
+    42→    42→  const [clocking, setClocking] = useState(false)
+    43→    43→
+    44→    44→  useEffect(() => {
+    45→    45→    if (!currentEmployee?.id) return
+    46→    46→    const uid = currentEmployee.id
+    47→    47→    const controller = new AbortController()
+    48→    48→
+    49→    49→    setLoading(true)
+    50→    50→
+    51→    51→    Promise.all([
+    52→    52→      authedFetch(`/api/tasks?assigneeId=${uid}`, { signal: controller.signal }).then((r) => r.json()).catch(() => []),
+    53→    53→      authedFetch('/api/announcements', { signal: controller.signal }).then((r) => r.json()).catch(() => []),
+    54→    54→      authedFetch(`/api/notifications?employeeId=${uid}`, { signal: controller.signal }).then((r) => r.json()).catch(() => []),
+    55→    55→      authedFetch(`/api/attendance?employeeId=${uid}&limit=1`, { signal: controller.signal }).then((r) => r.json()).catch(() => []),
+    56→    56→      authedFetch('/api/holidays?upcoming=true', { signal: controller.signal }).then((r) => r.json()).catch(() => []),
+    57→    57→      authedFetch(`/api/leave/balance?employeeId=${uid}`, { signal: controller.signal }).then((r) => r.json()).catch(() => null),
+    58→    58→      authedFetch(`/api/analytics?employeeId=${uid}`, { signal: controller.signal }).then((r) => r.json()).catch(() => null),
+    59→    59→      authedFetch(`/api/goals?employeeId=${uid}`, { signal: controller.signal }).then((r) => r.json()).catch(() => []),
+    60→    60→      authedFetch(`/api/meetings?employeeId=${uid}`, { signal: controller.signal }).then((r) => r.json()).catch(() => []),
+    61→    61→    ]).then(([t, a, n, att, h, b, an, g, m]) => {
+    62→    62→      const currentUid = useApp.getState().currentEmployee?.id
+    63→    63→      if (currentUid !== uid) return
+    64→    64→
+    65→    65→      setTasks(t || []); setAnnouncements(a || []); setNotifs(n || []); setTodayAtt(Array.isArray(att) ? att[0] || null : null); setUpcomingHolidays(h || []); setBalance(b || null); if (an) setAnalytics(an); setGoals(g || []); setMeetings(m || [])
+    66→    66→    }).finally(() => {
+    67→    67→      const currentUid = useApp.getState().currentEmployee?.id
+    68→    68→      if (currentUid === uid) setLoading(false)
+    69→    69→    })
+    70→    70→
+    71→    71→    return () => controller.abort()
+    72→    72→  }, [currentEmployee?.id, dataVersion])
+    73→    73→
+    74→    74→  async function clock(action: 'CHECK_IN' | 'CHECK_OUT') {
+    75→    75→    if (!currentEmployee) return
+    76→    76→    setClocking(true)
+    77→    77→    try {
+    78→    78→      const res = await authedFetch('/api/attendance', {
+    79→    79→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+    80→    80→        body: JSON.stringify({ employeeId: currentEmployee.id, action }),
+    81→    81→      })
+    82→    82→      if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
+    83→    83→      const rec = await res.json()
+    84→    84→      setTodayAtt(rec)
+    85→    85→      toast.success(action === 'CHECK_IN' ? 'Checked in' : 'Checked out')
+    86→    86→    } catch (e: any) { toast.error(e.message || 'Action failed') }
+    87→    87→    finally { setClocking(false) }
+    88→    88→  }
+    89→    89→
+    90→    90→  if (loading) {
+    91→    91→    return (
+    92→    92→      <div className="space-y-4">
+    93→    93→        <div className="h-32 rounded-xl bg-muted/40 animate-skeleton" />
+    94→    94→        <div className="grid grid-cols-4 gap-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 rounded-lg bg-muted/40 animate-skeleton" />)}</div>
+    95→    95→        <div className="grid grid-cols-3 gap-4">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-48 rounded-lg bg-muted/40 animate-skeleton" />)}</div>
+    96→    96→      </div>
+    97→    97→    )
+    98→    98→  }
+    99→    99→
+   100→   100→  if (!currentEmployee) return null
+   101→   101→  const emp = currentEmployee
+   102→   102→  const inProgress = tasks.filter((t) => t.status === 'IN_PROGRESS')
+   103→   103→  const pending = tasks.filter((t) => !['COMPLETED', 'APPROVED'].includes(t.status))
+   104→   104→  const dueSoon = tasks.filter((t) => {
+   105→   105→    if (!t.deadline) return false
+   106→   106→    const d = daysUntil(t.deadline)
+   107→   107→    return d !== null && d >= 0 && d <= 3 && !['COMPLETED', 'APPROVED'].includes(t.status)
+   108→   108→  })
+   109→   109→  const overdue = tasks.filter((t) => {
+   110→   110→    if (!t.deadline) return false
+   111→   111→    const d = daysUntil(t.deadline)
+   112→   112→    return d !== null && d < 0 && !['COMPLETED', 'APPROVED'].includes(t.status)
+   113→   113→  })
+   114→   114→  const isCheckedIn = !!todayAtt?.checkIn && !todayAtt?.checkOut
+   115→   115→  const isCheckedOut = !!todayAtt?.checkOut
+   116→   116→  const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6
+   117→   117→  const todayMeetings = meetings.filter((m) => new Date(m.startTime).toDateString() === new Date().toDateString())
+   118→   118→  const totalLeave = balance ? balance.casualLeave + balance.sickLeave + balance.earnedLeave : 0
+   119→   119→  const completedPct = analytics && analytics.totalTasks ? Math.round((analytics.completedTasks! / analytics.totalTasks) * 100) : 0
+   120→   120→
+   121→   121→  // Calculate working duration
+   122→   122→  const workingHours = isCheckedIn && todayAtt?.checkIn
+   123→   123→    ? ((Date.now() - new Date(todayAtt.checkIn).getTime()) / 3600000)
+   124→   124→    : todayAtt?.workHours || 0
+   125→   125→
+   126→   126→  return (
+   127→   127→    <div className="space-y-5">
+   128→   128→      {/* ============================================================
+   129→   129→          WELCOME / TODAY — Refined hero, not a flat green rectangle
+   130→   130→          ============================================================ */}
+   131→   131→      <div className="relative rounded-xl overflow-hidden border border-border/60">
+   132→   132→        {/* Subtle gradient surface with depth */}
+   133→   133→        <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-primary/3 to-transparent" />
+   134→   134→        <div className="absolute inset-0 bg-dots opacity-30" />
+   135→   135→        <div className="absolute top-0 right-0 h-full w-1/3 bg-gradient-to-l from-primary/5 to-transparent" />
+   136→   136→
+   137→   137→        <div className="relative z-10 px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+   138→   138→          {/* Left: Identity */}
+   139→   139→          <div className="flex items-center gap-3.5">
+   140→   140→            <Avatar className="h-12 w-12 ring-2 ring-primary/15">
+   141→   141→              <AvatarImage src={emp.photoUrl} alt={emp.name} />
+   142→   142→              <AvatarFallback className="bg-primary/10 text-primary font-semibold">{initials(emp.name)}</AvatarFallback>
+   143→   143→            </Avatar>
+   144→   144→            <div>
+   145→   145→              <p className="text-[12px] text-muted-foreground">{greeting()},</p>
+   146→   146→              <h2 className="text-[22px] font-bold tracking-tight leading-tight">{emp.name.split(' ')[0]}</h2>
+   147→   147→              <p className="text-[12px] text-muted-foreground mt-0.5">
+   148→   148→                {emp.designation} · {emp.department} · {fmtDate(new Date(), 'EEE, d MMM')}
+   149→   149→              </p>
+   150→   150→            </div>
+   151→   151→          </div>
+   152→   152→
+   153→   153→          {/* Right: Attendance state + action */}
+   154→   154→          <div className="flex items-center gap-3 shrink-0">
+   155→   155→            {!isWeekend && !isCheckedIn && !isCheckedOut && (
+   156→   156→              <button
+   157→   157→                onClick={() => clock('CHECK_IN')}
+   158→   158→                disabled={clocking}
+   159→   159→                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+   160→   160→              >
+   161→   161→                <Play className="h-3.5 w-3.5" /> Check In
+   162→   162→              </button>
+   163→   163→            )}
+   164→   164→            {!isWeekend && isCheckedIn && (
+   165→   165→              <div className="flex items-center gap-3">
+   166→   166→                <div className="text-right">
+   167→   167→                  <div className="flex items-center gap-1.5 justify-end">
+   168→   168→                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+   169→   169→                    <span className="text-[12px] font-medium text-emerald-600">Clocked in</span>
+   170→   170→                  </div>
+   171→   171→                  <p className="text-[11px] text-muted-foreground">
+   172→   172→                    {todayAtt?.checkIn ? `Since ${fmtTime(todayAtt.checkIn)}` : ''} · {workingHours.toFixed(1)}h
+   173→   173→                  </p>
+   174→   174→                </div>
+   175→   175→                <button
+   176→   176→                  onClick={() => clock('CHECK_OUT')}
+   177→   177→                  disabled={clocking}
+   178→   178→                  className="flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3.5 py-2 text-[13px] font-medium text-rose-700 hover:bg-rose-100 transition-colors dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400"
+   179→   179→                >
+   180→   180→                  <Square className="h-3 w-3" /> Check Out
+   181→   181→                </button>
+   182→   182→              </div>
+   183→   183→            )}
+   184→   184→            {!isWeekend && isCheckedOut && (
+   185→   185→              <div className="flex items-center gap-2 text-right">
+   186→   186→                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+   187→   187→                <div>
+   188→   188→                  <p className="text-[12px] font-medium text-emerald-600">Day complete</p>
+   189→   189→                  <p className="text-[11px] text-muted-foreground">{todayAtt?.workHours?.toFixed(1)}h logged</p>
+   190→   190→                </div>
+   191→   191→              </div>
+   192→   192→            )}
+   193→   193→            {isWeekend && (
+   194→   194→              <div className="flex items-center gap-2 rounded-lg bg-amber-50 dark:bg-amber-500/10 px-3 py-2">
+   195→   195→                <Coffee className="h-4 w-4 text-amber-600" />
+   196→   196→                <span className="text-[12px] font-medium text-amber-700 dark:text-amber-400">Weekend</span>
+   197→   197→              </div>
+   198→   198→            )}
+   199→   199→          </div>
+   200→   200→        </div>
+   201→   201→      </div>
+   202→   202→
+   203→   203→      {/* ============================================================
+   204→   204→          COMPACT METRICS ROW — Not 4 identical cards
+   205→   205→          Different visual weight per metric
+   206→   206→          ============================================================ */}
+   207→   207→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+   208→   208→        {/* Attendance — primary metric with status indicator */}
+   209→   209→        <div className="rounded-lg border border-border/60 px-4 py-3 hover:shadow-card transition-all">
+   210→   210→          <div className="flex items-center justify-between mb-1">
+   211→   211→            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Attendance</span>
+   212→   212→            <span className={`h-1.5 w-1.5 rounded-full ${isCheckedIn ? 'bg-emerald-500' : isCheckedOut ? 'bg-emerald-400' : 'bg-zinc-300'}`} />
+   213→   213→          </div>
+   214→   214→          <p className="text-[24px] font-bold tracking-tight leading-none">92%</p>
+   215→   215→          <p className="text-[10px] text-muted-foreground mt-1">
+   216→   216→            {isWeekend ? 'Weekend' : isCheckedOut ? `${todayAtt?.workHours?.toFixed(1)}h logged` : isCheckedIn ? 'Clocked in' : 'Not checked in'}
+   217→   217→          </p>
+   218→   218→        </div>
+   219→   219→
+   220→   220→        {/* Leave — with mini progress */}
+   221→   221→        <div className="rounded-lg border border-border/60 px-4 py-3 hover:shadow-card transition-all">
+   222→   222→          <div className="flex items-center justify-between mb-1">
+   223→   223→            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Leave Balance</span>
+   224→   224→            <CalendarDays className="h-3 w-3 text-muted-foreground/40" />
+   225→   225→          </div>
+   226→   226→          <p className="text-[24px] font-bold tracking-tight leading-none">{totalLeave} <span className="text-[14px] font-normal text-muted-foreground">days</span></p>
+   227→   227→          <div className="flex items-center gap-1.5 mt-2">
+   228→   228→            <span className="text-[9px] text-muted-foreground">C {balance?.casualLeave}</span>
+   229→   229→            <span className="text-[9px] text-muted-foreground">S {balance?.sickLeave}</span>
+   230→   230→            <span className="text-[9px] text-muted-foreground">E {balance?.earnedLeave}</span>
+   231→   231→          </div>
+   232→   232→        </div>
+   233→   233→
+   234→   234→        {/* Tasks — with trend indicator */}
+   235→   235→        <div className="rounded-lg border-l-2 border-l-sky-400 rounded-r-lg border border-border/60 border-l-0 px-4 py-3 hover:shadow-card transition-all" style={{ borderLeftWidth: '2px', borderLeftColor: 'oklch(0.6 0.12 230)' }}>
+   236→   236→          <div className="flex items-center justify-between mb-1">
+   237→   237→            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Tasks</span>
+   238→   238→            <span className="text-[9px] font-medium text-sky-600">{inProgress.length} active</span>
+   239→   239→          </div>
+   240→   240→          <p className="text-[24px] font-bold tracking-tight leading-none">{pending.length}</p>
+   241→   241→          <p className="text-[10px] text-muted-foreground mt-1">
+   242→   242→            {dueSoon.length > 0 ? `${dueSoon.length} due soon` : overdue.length > 0 ? `${overdue.length} overdue` : 'All on track'}
+   243→   243→          </p>
+   244→   244→        </div>
+   245→   245→
+   246→   246→        {/* Performance — compact */}
+   247→   247→        <div className="rounded-lg border border-border/60 px-4 py-3 hover:shadow-card transition-all">
+   248→   248→          <div className="flex items-center justify-between mb-1">
+   249→   249→            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Performance</span>
+   250→   250→            <TrendingUp className="h-3 w-3 text-emerald-500" />
+   251→   251→          </div>
+   252→   252→          <p className="text-[24px] font-bold tracking-tight leading-none">86%</p>
+   253→   253→          <p className="text-[10px] text-emerald-600 mt-1">↑ 4 pts this quarter</p>
+   254→   254→        </div>
+   255→   255→      </div>
+   256→   256→
+   257→   257→      {/* ============================================================
+   258→   258→          SECOND ROW — Three-column composition
+   259→   259→          Left: Today's Schedule (timeline)
+   260→   260→          Center: Quick actions (compact)
+   261→   261→          Right: Announcements
+   262→   262→          ============================================================ */}
+   263→   263→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   264→   264→        {/* Today's Schedule — Timeline style, not a card-in-a-card */}
+   265→   265→        <div className="lg:col-span-2">
+   266→   266→          <div className="flex items-center justify-between mb-3">
+   267→   267→            <div>
+   268→   268→              <p className="text-[14px] font-semibold">Today's Schedule</p>
+   269→   269→              <p className="text-[11px] text-muted-foreground">{todayMeetings.length} meetings</p>
+   270→   270→            </div>
+   271→   271→            <button onClick={() => setView('meetings')} className="text-[11px] text-primary hover:underline flex items-center gap-0.5">
+   272→   272→              All <ArrowRight className="h-3 w-3" />
+   273→   273→            </button>
+   274→   274→          </div>
+   275→   275→          <div className="space-y-0">
+   276→   276→            {todayMeetings.length > 0 ? todayMeetings.slice(0, 4).map((m, i) => {
+   277→   277→              const typeColors: Record<string, string> = { STANDUP: 'bg-emerald-400', REVIEW: 'bg-sky-400', TRAINING: 'bg-rose-400', MEETING: 'bg-primary', INTERVIEW: 'bg-violet-400', OTHER: 'bg-amber-400' }
+   278→   278→              return (
+   279→   279→                <div key={m.id} className="flex items-start gap-3 py-2.5 border-b border-border/40 last:border-0 group cursor-pointer" onClick={() => setView('meetings')}>
+   280→   280→                  <div className="text-[12px] font-semibold text-muted-foreground w-12 shrink-0 pt-0.5">{fmtTime(m.startTime)}</div>
+   281→   281→                  <div className={`w-0.5 self-stretch rounded-full ${typeColors[m.type] || 'bg-zinc-300'} shrink-0`} />
+   282→   282→                  <div className="min-w-0 flex-1">
+   283→   283→                    <p className="text-[13px] font-medium group-hover:text-primary transition-colors truncate">{m.title}</p>
+   284→   284→                    <p className="text-[11px] text-muted-foreground truncate">{m.description || m.location}</p>
+   285→   285→                  </div>
+   286→   286→                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-muted-foreground transition-colors shrink-0 mt-1" />
+   287→   287→                </div>
+   288→   288→              )
+   289→   289→            }) : (
+   290→   290→              <div className="py-8 text-center">
+   291→   291→                <Calendar className="h-7 w-7 mx-auto mb-2 text-muted-foreground/30" />
+   292→   292→                <p className="text-[13px] text-muted-foreground">No meetings scheduled today</p>
+   293→   293→              </div>
+   294→   294→            )}
+   295→   295→          </div>
+   296→   296→        </div>
+   297→   297→
+   298→   298→        {/* Quick Actions — Compact grid, no card wrapper */}
+   299→   299→        <div>
+   300→   300→          <p className="text-[14px] font-semibold mb-3">Quick Actions</p>
+   301→   301→          <div className="grid grid-cols-2 gap-2">
+   302→   302→            {[
+   303→   303→              { label: 'Attendance', icon: Clock, view: 'attendance' as const, tint: 'text-emerald-600' },
+   304→   304→              { label: 'Apply Leave', icon: CalendarDays, view: 'leave' as const, tint: 'text-amber-600' },
+   305→   305→              { label: 'My Tasks', icon: ListChecks, view: 'tasks' as const, tint: 'text-sky-600' },
+   306→   306→              { label: 'Service Request', icon: Megaphone, view: 'requests' as const, tint: 'text-violet-600' },
+   307→   307→            ].map((a) => {
+   308→   308→              const Icon = a.icon
+   309→   309→              return (
+   310→   310→                <button key={a.label} onClick={() => setView(a.view)} className="flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2.5 text-left hover:bg-accent/40 hover:border-border transition-all group">
+   311→   311→                  <Icon className={`h-3.5 w-3.5 ${a.tint}`} />
+   312→   312→                  <span className="text-[12px] font-medium">{a.label}</span>
+   313→   313→                </button>
+   314→   314→              )
+   315→   315→            })}
+   316→   316→          </div>
+   317→   317→          <button onClick={() => setView('ai-assistant')} className="w-full mt-2 flex items-center gap-2 rounded-lg border border-dashed border-violet-300/40 bg-violet-500/5 px-3 py-2 text-left hover:bg-violet-500/10 transition-colors group">
+   318→   318→            <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+   319→   319→            <span className="text-[12px] font-medium text-violet-600">Ask AI Assistant</span>
+   320→   320→          </button>
+   321→   321→        </div>
+   322→   322→      </div>
+   323→   323→
+   324→   324→      {/* ============================================================
+   325→   325→          THIRD ROW — My Tasks (list) + Leave Balance (compact) + Activity
+   326→   326→          Different visual treatment per section
+   327→   327→          ============================================================ */}
+   328→   328→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   329→   329→        {/* My Tasks — Compact list, no card wrapper */}
+   330→   330→        <div className="lg:col-span-2">
+   331→   331→          <div className="flex items-center justify-between mb-3">
+   332→   332→            <div>
+   333→   333→              <p className="text-[14px] font-semibold">My Tasks</p>
+   334→   334→              <p className="text-[11px] text-muted-foreground">{pending.length} pending · {inProgress.length} in progress · {overdue.length} overdue</p>
+   335→   335→            </div>
+   336→   336→            <button onClick={() => setView('tasks')} className="text-[11px] text-primary hover:underline flex items-center gap-0.5">
+   337→   337→              View all <ArrowRight className="h-3 w-3" />
+   338→   338→            </button>
+   339→   339→          </div>
+   340→   340→          {pending.length > 0 ? (
+   341→   341→            <div className="space-y-1">
+   342→   342→              {pending.slice(0, 4).map((t) => {
+   343→   343→                const d = t.deadline ? daysUntil(t.deadline) : null
+   344→   344→                return (
+   345→   345→                  <div key={t.id} onClick={() => setView('tasks')} className="flex items-center gap-3 rounded-md px-2.5 py-2 hover:bg-accent/40 cursor-pointer transition-colors group">
+   346→   346→                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${t.status === 'IN_PROGRESS' ? 'bg-sky-500' : 'bg-zinc-300'}`} />
+   347→   347→                    <div className="min-w-0 flex-1">
+   348→   348→                      <p className="text-[13px] font-medium truncate group-hover:text-primary transition-colors">{t.title}</p>
+   349→   349→                      <p className="text-[10px] text-muted-foreground truncate">{t.project?.name || 'No project'}</p>
+   350→   350→                    </div>
+   351→   351→                    {d !== null && d < 0 && <span className="text-[10px] text-rose-600 font-medium">Overdue</span>}
+   352→   352→                    {d !== null && d >= 0 && d <= 3 && <span className="text-[10px] text-amber-600 font-medium">{d === 0 ? 'Today' : `${d}d left`}</span>}
+   353→   353→                    {d !== null && d > 3 && <span className="text-[10px] text-muted-foreground">{d}d</span>}
+   354→   354→                  </div>
+   355→   355→                )
+   356→   356→              })}
+   357→   357→            </div>
+   358→   358→          ) : (
+   359→   359→            <div className="py-6 text-center">
+   360→   360→              <CheckCircle2 className="h-7 w-7 mx-auto mb-2 text-emerald-500/60" />
+   361→   361→              <p className="text-[13px] text-muted-foreground">All caught up — no pending tasks</p>
+   362→   362→            </div>
+   363→   363→          )}
+   364→   364→        </div>
+   365→   365→
+   366→   366→        {/* Leave Balance — Compact visual, no card */}
+   367→   367→        <div>
+   368→   368→          <p className="text-[14px] font-semibold mb-3">Leave Balance</p>
+   369→   369→          <div className="space-y-3">
+   370→   370→            {balance && [
+   371→   371→              { label: 'Casual', value: balance.casualLeave, total: 12, color: 'bg-sky-400' },
+   372→   372→              { label: 'Sick', value: balance.sickLeave, total: 12, color: 'bg-rose-400' },
+   373→   373→              { label: 'Earned', value: balance.earnedLeave, total: 15, color: 'bg-emerald-400' },
+   374→   374→            ].map((l) => (
+   375→   375→              <div key={l.label}>
+   376→   376→                <div className="flex items-center justify-between mb-1">
+   377→   377→                  <span className="text-[12px] font-medium">{l.label}</span>
+   378→   378→                  <span className="text-[12px] text-muted-foreground">{l.value}/{l.total}</span>
+   379→   379→                </div>
+   380→   380→                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+   381→   381→                  <div className={`h-full ${l.color} rounded-full transition-all`} style={{ width: `${(l.value / l.total) * 100}%` }} />
+   382→   382→                </div>
+   383→   383→              </div>
+   384→   384→            ))}
+   385→   385→          </div>
+   386→   386→        </div>
+   387→   387→      </div>
+   388→   388→
+   389→   389→      {/* ============================================================
+   390→   390→          FOURTH ROW — Goals + Holidays + Announcements
+   391→   391→          ============================================================ */}
+   392→   392→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   393→   393→        {/* Goals Progress */}
+   394→   394→        <div>
+   395→   395→          <div className="flex items-center justify-between mb-3">
+   396→   396→            <p className="text-[14px] font-semibold">Goals</p>
+   397→   397→            <button onClick={() => setView('goals')} className="text-[11px] text-primary hover:underline">All</button>
+   398→   398→          </div>
+   399→   399→          {goals.length > 0 ? goals.slice(0, 3).map((g) => (
+   400→   400→            <div key={g.id} className="mb-2.5 last:mb-0">
+   401→   401→              <div className="flex items-center justify-between mb-1">
+   402→   402→                <span className="text-[12px] font-medium truncate">{g.title}</span>
+   403→   403→                <span className={`text-[10px] ${g.progress >= 100 ? 'text-emerald-600 font-semibold' : 'text-muted-foreground'}`}>{g.progress}%</span>
+   404→   404→              </div>
+   405→   405→              <Progress value={g.progress} className="h-1" />
+   406→   406→            </div>
+   407→   407→          )) : <p className="text-[12px] text-muted-foreground py-4">No active goals</p>}
+   408→   408→        </div>
+   409→   409→
+   410→   410→        {/* Upcoming Holidays */}
+   411→   411→        <div>
+   412→   412→          <div className="flex items-center justify-between mb-3">
+   413→   413→            <p className="text-[14px] font-semibold">Holidays</p>
+   414→   414→            <button onClick={() => setView('calendar')} className="text-[11px] text-primary hover:underline">Calendar</button>
+   415→   415→          </div>
+   416→   416→          <div className="space-y-2">
+   417→   417→            {upcomingHolidays.slice(0, 3).map((h) => (
+   418→   418→              <div key={h.id} className="flex items-center gap-2.5">
+   419→   419→                <div className="flex flex-col items-center justify-center h-9 w-9 rounded-md bg-primary/8 text-primary shrink-0">
+   420→   420→                  <span className="text-[8px] font-medium uppercase">{fmtDate(h.date, 'MMM')}</span>
+   421→   421→                  <span className="text-[13px] font-bold leading-none">{fmtDate(h.date, 'd')}</span>
+   422→   422→                </div>
+   423→   423→                <div className="min-w-0">
+   424→   424→                  <p className="text-[12px] font-medium truncate">{h.name}</p>
+   425→   425→                  <p className="text-[10px] text-muted-foreground">{fmtDate(h.date, 'EEE')} · {h.type}</p>
+   426→   426→                </div>
+   427→   427→              </div>
+   428→   428→            ))}
+   429→   429→            {upcomingHolidays.length === 0 && <p className="text-[12px] text-muted-foreground py-4">No upcoming holidays</p>}
+   430→   430→          </div>
+   431→   431→        </div>
+   432→   432→
+   433→   433→        {/* Announcements */}
+   434→   434→        <div>
+   435→   435→          <div className="flex items-center justify-between mb-3">
+   436→   436→            <p className="text-[14px] font-semibold">Announcements</p>
+   437→   437→            <button onClick={() => setView('announcements')} className="text-[11px] text-primary hover:underline">All</button>
+   438→   438→          </div>
+   439→   439→          <div className="space-y-2">
+   440→   440→            {announcements.slice(0, 3).map((a) => (
+   441→   441→              <div key={a.id} onClick={() => setView('announcements')} className="cursor-pointer rounded-md px-2 py-1.5 hover:bg-accent/40 transition-colors">
+   442→   442→                <p className="text-[12px] font-medium leading-snug truncate">{a.title}</p>
+   443→   443→                <p className="text-[10px] text-muted-foreground truncate">{a.authorName} · {fmtRelative(a.publishedAt)}</p>
+   444→   444→              </div>
+   445→   445→            ))}
+   446→   446→            {announcements.length === 0 && <p className="text-[12px] text-muted-foreground py-4">No announcements</p>}
+   447→   447→          </div>
+   448→   448→        </div>
+   449→   449→      </div>
+   450→   450→
+   451→   451→      {/* Activity Feed — full width, no card wrapper */}
+   452→   452→      <ActivityFeed />
+   453→   453→    </div>
+   454→   454→  )
+   455→   455→}
+   456→   456→
+   457→   457→// Inline Activity Feed (simplified, no card wrapper)
+   458→   458→function ActivityFeed() {
+   459→   459→  const { currentEmployee } = useApp()
+   460→   460→  const [activities, setActivities] = useState<any[]>([])
+   461→   461→
+   462→   462→  useEffect(() => {
+   463→   463→    if (!currentEmployee) return
+   464→   464→    const isManager = ['MANAGER', 'HR', 'ADMIN'].includes(currentEmployee.role)
+   465→   465→    const url = isManager ? `/api/activity?scope=org&managerId=${currentEmployee.id}&limit=8` : `/api/activity?limit=8`
+   466→   466→    authedFetch(url).then(r => r.ok ? r.json() : []).then(a => setActivities(Array.isArray(a) ? a : [])).catch(() => {})
+   467→   467→  }, [currentEmployee])
+   468→   468→
+   469→   469→  if (activities.length === 0) return null
+   470→   470→
+   471→   471→  return (
+   472→   472→    <div>
+   473→   473→      <p className="text-[14px] font-semibold mb-3">Recent Activity</p>
+   474→   474→      <div className="space-y-0">
+   475→   475→        {activities.slice(0, 6).map((a) => (
+   476→   476→          <div key={a.id} className="flex items-start gap-2.5 py-2 border-b border-border/30 last:border-0">
+   477→   477→            <span className="h-1 w-1 rounded-full bg-primary/40 mt-2 shrink-0" />
+   478→   478→            <div className="min-w-0 flex-1">
+   479→   479→              <p className="text-[12px] leading-snug">
+   480→   480→                <span className="font-medium">{a.actorName}</span>{' '}
+   481→   481→                <span className="text-muted-foreground">{a.action}</span>
+   482→   482→              </p>
+   483→   483→              <p className="text-[10px] text-muted-foreground truncate">{a.title}</p>
+   484→   484→            </div>
+   485→   485→            <span className="text-[10px] text-muted-foreground/50 shrink-0">{fmtRelative(a.timestamp)}</span>
+   486→   486→          </div>
+   487→   487→        ))}
+   488→   488→      </div>
+   489→   489→    </div>
+   490→   490→  )
+   491→   491→}
+   492→   492→

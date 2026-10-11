@@ -1,0 +1,637 @@
+     1→'use client'
+     2→
+     3→import { useState, useEffect } from 'react'
+     4→import { useApp } from '@/lib/store'
+     5→import { Card } from '@/components/ui/card'
+     6→import { Button } from '@/components/ui/button'
+     7→import { Badge } from '@/components/ui/badge'
+     8→import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+     9→import { Textarea } from '@/components/ui/textarea'
+    10→import { Input } from '@/components/ui/input'
+    11→import { Label } from '@/components/ui/label'
+    12→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+    13→import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
+    14→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    15→import { Progress } from '@/components/ui/progress'
+    16→import { StatCard, PageHeader, EmptyState } from '@/components/portal/ui-helpers'
+    17→import { CelebrationOverlay } from '@/components/portal/celebration'
+    18→import { KanbanBoard } from '@/components/portal/kanban-board'
+    19→import { TaskCompletionTrend } from '@/components/portal/task-completion-trend'
+    20→import { fmtDate, fmtRelative, taskColor, taskLabel, priorityColor, daysUntil, initials } from '@/lib/format'
+    21→import { toast } from 'sonner'
+    22→import type { TaskT, EmployeeT } from '@/lib/types'
+    23→import {
+    24→  ListChecks, Plus, Clock, AlertCircle, CheckCircle2, Bot, FileText,
+    25→  Calendar, User, Sparkles, Loader2, ArrowLeft, Send, Award, Star, Save,
+    26→} from 'lucide-react'
+    27→
+    28→const COLUMNS = [
+    29→  { id: 'CREATED', label: 'To Do', color: 'bg-zinc-400' },
+    30→  { id: 'ASSIGNED', label: 'Assigned', color: 'bg-sky-500' },
+    31→  { id: 'IN_PROGRESS', label: 'In Progress', color: 'bg-blue-500' },
+    32→  { id: 'SUBMITTED', label: 'Submitted', color: 'bg-amber-500' },
+    33→  { id: 'UNDER_REVIEW', label: 'Under Review', color: 'bg-violet-500' },
+    34→  { id: 'APPROVED', label: 'Approved', color: 'bg-teal-500' },
+    35→  { id: 'COMPLETED', label: 'Completed', color: 'bg-emerald-500' },
+    36→]
+    37→
+    38→export function TasksView() {
+    39→  const { currentEmployee, selectedTaskId, setSelectedTaskId } = useApp()
+    40→  const [tasks, setTasks] = useState<TaskT[]>([])
+    41→  const [reportees, setReportees] = useState<EmployeeT[]>([])
+    42→  const [loading, setLoading] = useState(true)
+    43→  const [createOpen, setCreateOpen] = useState(false)
+    44→
+    45→  async function load() {
+    46→    if (!currentEmployee) return
+    47→    // For managers, show team tasks; for employees, show assigned
+    48→    const isManager = ['MANAGER', 'HR', 'ADMIN'].includes(currentEmployee.role)
+    49→    const url = isManager
+    50→      ? `/api/tasks?creatorId=${currentEmployee.id}`
+    51→      : `/api/tasks?assigneeId=${currentEmployee.id}`
+    52→    const t = await fetch(url).then((r) => r.json())
+    53→    setTasks(t)
+    54→    if (isManager) {
+    55→      const r = await fetch(`/api/employees?managerId=${currentEmployee.id}`).then((r) => r.json())
+    56→      setReportees(r)
+    57→    }
+    58→    setLoading(false)
+    59→  }
+    60→
+    61→  useEffect(() => { load() }, [currentEmployee?.id])
+    62→
+    63→  async function handleStatusChange(taskId: string, newStatus: string) {
+    64→    // Optimistic update
+    65→    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: newStatus } : t))
+    66→    // Map drag-drop status to the appropriate action
+    67→    const actionMap: Record<string, string> = {
+    68→      CREATED: 'START', // can't easily map; use a generic update
+    69→      ASSIGNED: 'START',
+    70→      IN_PROGRESS: 'START',
+    71→      SUBMITTED: 'SUBMIT',
+    72→      UNDER_REVIEW: 'SUBMIT',
+    73→      APPROVED: 'APPROVE',
+    74→      COMPLETED: 'COMPLETE',
+    75→    }
+    76→    try {
+    77→      // Use a direct PATCH with the status action
+    78→      const action = actionMap[newStatus] || 'START'
+    79→      const res = await fetch(`/api/tasks/${taskId}`, {
+    80→        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    81→        body: JSON.stringify({ action }),
+    82→      })
+    83→      if (!res.ok) throw new Error()
+    84→      toast.success(`Task moved to ${newStatus.replace(/_/g, ' ').toLowerCase()}`)
+    85→    } catch {
+    86→      toast.error('Failed to update status')
+    87→      load() // revert on failure
+    88→    }
+    89→  }
+    90→
+    91→  if (selectedTaskId) return <TaskDetail taskId={selectedTaskId} onBack={() => setSelectedTaskId(null)} onChange={load} />
+    92→
+    93→  return (
+    94→    <div className="space-y-6">
+    95→      <PageHeader
+    96→        title="My Tasks"
+    97→        description={currentEmployee && ['MANAGER', 'HR', 'ADMIN'].includes(currentEmployee.role) ? "Manage your team's work & assignments" : 'Track your assignments, deadlines and submissions'}
+    98→        actions={
+    99→          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+   100→            <DialogTrigger asChild><Button className="gap-2"><Plus className="h-4 w-4" /> New Task</Button></DialogTrigger>
+   101→            <CreateTaskDialog reportees={reportees} onClose={() => setCreateOpen(false)} onCreated={load} />
+   102→          </Dialog>
+   103→        }
+   104→      />
+   105→
+   106→      {/* Stats */}
+   107→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   108→        <StatCard label="Total Tasks" value={tasks.length} icon={ListChecks} accent="primary" />
+   109→        <StatCard label="In Progress" value={tasks.filter((t) => t.status === 'IN_PROGRESS').length} icon={Clock} accent="sky" />
+   110→        <StatCard label="Completed" value={tasks.filter((t) => t.status === 'COMPLETED' || t.status === 'APPROVED').length} icon={CheckCircle2} accent="emerald" />
+   111→        <StatCard label="Overdue" value={tasks.filter((t) => t.deadline && (daysUntil(t.deadline) ?? 1) < 0 && !['COMPLETED', 'APPROVED'].includes(t.status)).length} icon={AlertCircle} accent="rose" />
+   112→      </div>
+   113→
+   114→      {/* Task completion trend chart */}
+   115→      <TaskCompletionTrend />
+   116→
+   117→      <Tabs defaultValue="board">
+   118→        <TabsList>
+   119→          <TabsTrigger value="board">Board</TabsTrigger>
+   120→          <TabsTrigger value="list">List</TabsTrigger>
+   121→        </TabsList>
+   122→
+   123→        <TabsContent value="board">
+   124→          {loading ? (
+   125→            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+   126→              {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-48 bg-muted animate-pulse rounded-lg" />)}
+   127→            </div>
+   128→          ) : tasks.length === 0 ? (
+   129→            <Card><EmptyState icon={ListChecks} title="No tasks yet" description="Tasks assigned to you will appear here." /></Card>
+   130→          ) : (
+   131→            <KanbanBoard tasks={tasks} onTaskClick={(id) => setSelectedTaskId(id)} onStatusChange={handleStatusChange} />
+   132→          )}
+   133→        </TabsContent>
+   134→
+   135→        <TabsContent value="list">
+   136→          {tasks.length === 0 ? <Card><EmptyState icon={ListChecks} title="No tasks" /></Card> : (
+   137→            <div className="space-y-2">
+   138→              {tasks.map((t) => <TaskCard key={t.id} task={t} onClick={() => setSelectedTaskId(t.id)} list />)}
+   139→            </div>
+   140→          )}
+   141→        </TabsContent>
+   142→      </Tabs>
+   143→    </div>
+   144→  )
+   145→}
+   146→
+   147→function TaskCard({ task, onClick, list }: { task: TaskT; onClick?: () => void; list?: boolean }) {
+   148→  const d = task.deadline ? daysUntil(task.deadline) : null
+   149→  const overdue = d !== null && d < 0 && !['COMPLETED', 'APPROVED'].includes(task.status)
+   150→  return (
+   151→    <button onClick={onClick} className={`w-full text-left rounded-lg border border-border bg-card p-3 hover:shadow-md hover:border-primary/30 transition-all group ${list ? 'flex items-center gap-3' : ''}`}>
+   152→      <div className={list ? 'flex-1 min-w-0' : ''}>
+   153→        <div className="flex items-start justify-between gap-2 mb-1.5">
+   154→          <p className="text-sm font-medium leading-snug group-hover:text-primary transition-colors">{task.title}</p>
+   155→          <Badge variant="outline" className={`text-[10px] shrink-0 ${priorityColor(task.priority)}`}>{task.priority}</Badge>
+   156→        </div>
+   157→        {task.description && !list && <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{task.description}</p>}
+   158→        {task.project && <Badge variant="secondary" className="text-[10px] mb-2">{task.project.name}</Badge>}
+   159→        <div className="flex items-center justify-between gap-2 mt-2">
+   160→          <div className="flex items-center gap-2 min-w-0">
+   161→            {task.assignee && (
+   162→              <div className="flex items-center gap-1.5 min-w-0">
+   163→                <Avatar className="h-5 w-5"><AvatarImage src={task.assignee.photoUrl} /><AvatarFallback className="text-[8px]">{initials(task.assignee.name)}</AvatarFallback></Avatar>
+   164→                <span className="text-[11px] text-muted-foreground truncate">{task.assignee.name.split(' ')[0]}</span>
+   165→              </div>
+   166→            )}
+   167→          </div>
+   168→          <div className="flex items-center gap-1.5 shrink-0">
+   169→            {task.deadline && (
+   170→              <Badge variant="outline" className={`text-[10px] ${overdue ? 'bg-rose-500/15 text-rose-600 border-rose-500/20' : (d !== null && d <= 3) ? 'bg-amber-500/15 text-amber-600 border-amber-500/20' : ''}`}>
+   171→                <Calendar className="h-2.5 w-2.5 mr-1" />{overdue ? 'Overdue' : d === 0 ? 'Today' : d !== null ? `${d}d` : ''}
+   172→              </Badge>
+   173→            )}
+   174→            <Badge variant="outline" className={`text-[10px] ${taskColor(task.status)}`}>{taskLabel(task.status)}</Badge>
+   175→          </div>
+   176→        </div>
+   177→      </div>
+   178→    </button>
+   179→  )
+   180→}
+   181→
+   182→function CreateTaskDialog({ reportees, onClose, onCreated }: { reportees: EmployeeT[]; onClose: () => void; onCreated: () => void }) {
+   183→  const { currentEmployee } = useApp()
+   184→  const [title, setTitle] = useState('')
+   185→  const [description, setDescription] = useState('')
+   186→  const [assigneeId, setAssigneeId] = useState('')
+   187→  const [priority, setPriority] = useState('MEDIUM')
+   188→  const [deadline, setDeadline] = useState('')
+   189→  const [expectedDeliverable, setExpectedDeliverable] = useState('')
+   190→  const [submitting, setSubmitting] = useState(false)
+   191→
+   192→  async function create() {
+   193→    if (!currentEmployee || !title) { toast.error('Title required'); return }
+   194→    setSubmitting(true)
+   195→    try {
+   196→      const res = await fetch('/api/tasks', {
+   197→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   198→        body: JSON.stringify({ title, description, assigneeId: assigneeId || undefined, creatorId: currentEmployee.id, priority, deadline: deadline || undefined, expectedDeliverable }),
+   199→      })
+   200→      if (!res.ok) throw new Error()
+   201→      toast.success('Task created')
+   202→      onClose(); onCreated()
+   203→    } catch { toast.error('Failed') } finally { setSubmitting(false) }
+   204→  }
+   205→
+   206→  return (
+   207→    <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+   208→      <DialogHeader><DialogTitle>Create New Task</DialogTitle></DialogHeader>
+   209→      <div className="space-y-4 py-2">
+   210→        <div className="space-y-1.5"><Label>Task Title</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Build login API" /></div>
+   211→        <div className="space-y-1.5"><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} /></div>
+   212→        <div className="grid grid-cols-2 gap-3">
+   213→          <div className="space-y-1.5"><Label>Assign To</Label>
+   214→            <Select value={assigneeId} onValueChange={setAssigneeId}>
+   215→              <SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger>
+   216→              <SelectContent>{reportees.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
+   217→            </Select>
+   218→          </div>
+   219→          <div className="space-y-1.5"><Label>Priority</Label>
+   220→            <Select value={priority} onValueChange={setPriority}>
+   221→              <SelectTrigger><SelectValue /></SelectTrigger>
+   222→              <SelectContent><SelectItem value="LOW">Low</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HIGH">High</SelectItem><SelectItem value="CRITICAL">Critical</SelectItem></SelectContent>
+   223→            </Select>
+   224→          </div>
+   225→        </div>
+   226→        <div className="space-y-1.5"><Label>Deadline</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
+   227→        <div className="space-y-1.5"><Label>Expected Deliverable</Label><Input value={expectedDeliverable} onChange={(e) => setExpectedDeliverable(e.target.value)} placeholder="What should be delivered" /></div>
+   228→      </div>
+   229→      <DialogFooter>
+   230→        <Button variant="outline" onClick={onClose}>Cancel</Button>
+   231→        <Button onClick={create} disabled={submitting}>{submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Task'}</Button>
+   232→      </DialogFooter>
+   233→    </DialogContent>
+   234→  )
+   235→}
+   236→
+   237→function TaskDetail({ taskId, onBack, onChange }: { taskId: string; onBack: () => void; onChange: () => void }) {
+   238→  const { currentEmployee } = useApp()
+   239→  const [task, setTask] = useState<TaskT | null>(null)
+   240→  const [loading, setLoading] = useState(true)
+   241→  const [submissionNote, setSubmissionNote] = useState('')
+   242→  const [managerScore, setManagerScore] = useState(80)
+   243→  const [managerFeedback, setManagerFeedback] = useState('')
+   244→  const [aiLoading, setAiLoading] = useState(false)
+   245→  const [celebrate, setCelebrate] = useState(0)
+   246→  const [celebrateMsg, setCelebrateMsg] = useState('')
+   247→  const [acting, setActing] = useState(false)
+   248→  // Submission workspace state
+   249→  const [submissions, setSubmissions] = useState<any[]>([])
+   250→  const [draftFiles, setDraftFiles] = useState('')
+   251→  const [draftLinks, setDraftLinks] = useState('')
+   252→  const [draftNote, setDraftNote] = useState('')
+   253→  const [draftSaved, setDraftSaved] = useState<string | null>(null)
+   254→  const [submittingSub, setSubmittingSub] = useState(false)
+   255→  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
+   256→
+   257→  async function load() {
+   258→    setLoading(true)
+   259→    const t = await fetch(`/api/tasks/${taskId}`).then((r) => r.json())
+   260→    setTask(t); setSubmissionNote(t.submissionNote || ''); setManagerScore(t.managerScore || 80); setManagerFeedback(t.managerFeedback || '')
+   261→    // Load submission history
+   262→    const subs = await fetch(`/api/submissions?taskId=${taskId}`).then((r) => r.json()).catch(() => [])
+   263→    setSubmissions(subs)
+   264→    // Restore draft from latest draft if exists
+   265→    const latestDraft = subs.find((s: any) => s.status === 'DRAFT')
+   266→    if (latestDraft) {
+   267→      setDraftNote(latestDraft.submissionNote || '')
+   268→      setDraftFiles(latestDraft.files || '')
+   269→      setDraftLinks(latestDraft.links || '')
+   270→      setDraftSaved(latestDraft.updatedAt)
+   271→    }
+   272→    setLoading(false)
+   273→  }
+   274→  useEffect(() => { load() }, [taskId])
+   275→
+   276→  async function act(action: string, extra?: any) {
+   277→    setActing(true)
+   278→    try {
+   279→      const res = await fetch(`/api/tasks/${taskId}`, {
+   280→        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+   281→        body: JSON.stringify({ action, ...extra }),
+   282→      })
+   283→      if (!res.ok) throw new Error()
+   284→      if (action === 'COMPLETE') {
+   285→        setCelebrateMsg('Task Completed! ✅')
+   286→        setCelebrate((c) => c + 1)
+   287→        toast.success('🎉 Task completed! Great work!')
+   288→      } else if (action === 'APPROVE') {
+   289→        setCelebrateMsg('Task Approved! ⭐')
+   290→        setCelebrate((c) => c + 1)
+   291→        toast.success('🎉 Task approved!')
+   292→      } else {
+   293→        toast.success('Task updated')
+   294→      }
+   295→      load(); onChange()
+   296→    } catch { toast.error('Failed') } finally { setActing(false) }
+   297→  }
+   298→
+   299→  async function runAIEval() {
+   300→    setAiLoading(true)
+   301→    try {
+   302→      const res = await fetch('/api/ai/evaluate', {
+   303→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   304→        body: JSON.stringify({ taskId }),
+   305→      })
+   306→      if (!res.ok) { const e = await res.json(); throw new Error(e.error) }
+   307→      toast.success('AI evaluation complete')
+   308→      load(); onChange()
+   309→    } catch (e: any) { toast.error(e.message || 'AI failed') } finally { setAiLoading(false) }
+   310→  }
+   311→
+   312→  // Save draft submission
+   313→  async function saveDraft() {
+   314→    if (!currentEmployee) return
+   315→    setSubmittingSub(true)
+   316→    try {
+   317→      // Check if there's an existing draft to update
+   318→      const existingDraft = submissions.find((s) => s.status === 'DRAFT')
+   319→      if (existingDraft) {
+   320→        await fetch('/api/submissions', {
+   321→          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+   322→          body: JSON.stringify({ id: existingDraft.id, submissionNote: draftNote, files: draftFiles, links: draftLinks, status: 'DRAFT' }),
+   323→        })
+   324→      } else {
+   325→        await fetch('/api/submissions', {
+   326→          method: 'POST', headers: { 'Content-Type': 'application/json' },
+   327→          body: JSON.stringify({ taskId, employeeId: currentEmployee.id, submissionNote: draftNote, files: draftFiles, links: draftLinks, status: 'DRAFT' }),
+   328→        })
+   329→      }
+   330→      setDraftSaved(new Date().toISOString())
+   331→      toast.success('Draft saved')
+   332→      load()
+   333→    } catch { toast.error('Failed to save draft') } finally { setSubmittingSub(false) }
+   334→  }
+   335→
+   336→  // Final submission
+   337→  async function submitFinal() {
+   338→    if (!currentEmployee) return
+   339→    setSubmittingSub(true)
+   340→    try {
+   341→      await fetch('/api/submissions', {
+   342→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   343→        body: JSON.stringify({ taskId, employeeId: currentEmployee.id, submissionNote: draftNote, files: draftFiles, links: draftLinks, status: 'SUBMITTED' }),
+   344→      })
+   345→      toast.success('✓ Submission received! Your manager has been notified.')
+   346→      setShowSubmitConfirm(false)
+   347→      load(); onChange()
+   348→    } catch { toast.error('Submission failed') } finally { setSubmittingSub(false) }
+   349→  }
+   350→
+   351→  if (loading) return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />)}</div>
+   352→  if (!task) return <EmptyState icon={AlertCircle} title="Task not found" action={<Button onClick={onBack} variant="outline"><ArrowLeft className="h-4 w-4 mr-2" /> Back</Button>} />
+   353→
+   354→  const isAssignee = currentEmployee?.id === task.assigneeId
+   355→  const isCreator = currentEmployee?.id === task.creatorId
+   356→  const isManagerRole = currentEmployee && ['MANAGER', 'HR', 'ADMIN'].includes(currentEmployee.role)
+   357→  const canSubmit = isAssignee && ['ASSIGNED', 'ACCEPTED', 'IN_PROGRESS'].includes(task.status)
+   358→  // Both assignee (self-assessment) and creator/manager can trigger AI evaluation
+   359→  const canEvaluate = (isCreator || isAssignee || isManagerRole) && (task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW')
+   360→  // Only creator/manager can give the final manager score
+   361→  const canReview = (isCreator || isManagerRole) && (task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW')
+   362→  const d = task.deadline ? daysUntil(task.deadline) : null
+   363→  const overdue = d !== null && d < 0 && !['COMPLETED', 'APPROVED'].includes(task.status)
+   364→
+   365→  return (
+   366→    <div className="space-y-6">
+   367→      <CelebrationOverlay trigger={celebrate} message={celebrateMsg} />
+   368→      <Button variant="ghost" size="sm" onClick={onBack} className="gap-2 -ml-2"><ArrowLeft className="h-4 w-4" /> Back to tasks</Button>
+   369→
+   370→      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+   371→        <div className="flex-1 min-w-0">
+   372→          <div className="flex items-center gap-2 flex-wrap mb-2">
+   373→            <Badge variant="outline" className={taskColor(task.status)}>{taskLabel(task.status)}</Badge>
+   374→            <Badge variant="outline" className={priorityColor(task.priority)}>{task.priority}</Badge>
+   375→            {task.project && <Badge variant="secondary" className="text-xs">{task.project.name}</Badge>}
+   376→            {overdue && <Badge variant="outline" className="bg-rose-500/15 text-rose-600">Overdue</Badge>}
+   377→          </div>
+   378→          <h2 className="text-2xl font-bold tracking-tight">{task.title}</h2>
+   379→          {task.description && <p className="text-sm text-muted-foreground mt-2">{task.description}</p>}
+   380→        </div>
+   381→      </div>
+   382→
+   383→      {/* Meta */}
+   384→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+   385→        {[
+   386→          { label: 'Assignee', value: task.assignee?.name || 'Unassigned', icon: User },
+   387→          { label: 'Deadline', value: task.deadline ? fmtDate(task.deadline, 'd MMM yyyy') : '—', icon: Calendar },
+   388→          { label: 'Submitted', value: task.submittedAt ? fmtRelative(task.submittedAt) : '—', icon: Send },
+   389→          { label: 'Completed', value: task.completedAt ? fmtRelative(task.completedAt) : '—', icon: CheckCircle2 },
+   390→        ].map((m) => {
+   391→          const Icon = m.icon
+   392→          return (
+   393→            <Card key={m.label} className="p-3">
+   394→              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1"><Icon className="h-3.5 w-3.5" />{m.label}</div>
+   395→              <p className="text-sm font-medium truncate">{m.value}</p>
+   396→            </Card>
+   397→          )
+   398→        })}
+   399→      </div>
+   400→
+   401→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+   402→        {/* Main: submission & actions */}
+   403→        <div className="lg:col-span-2 space-y-6">
+   404→          {task.expectedDeliverable && (
+   405→            <Card className="p-5">
+   406→              <p className="font-semibold mb-2 flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> Expected Deliverable</p>
+   407→              <p className="text-sm text-muted-foreground">{task.expectedDeliverable}</p>
+   408→              {task.evaluationCriteria && <p className="text-sm text-muted-foreground mt-3 pt-3 border-t">Evaluation: {task.evaluationCriteria}</p>}
+   409→            </Card>
+   410→          )}
+   411→
+   412→          {/* Submission Workspace */}
+   413→          {canSubmit ? (
+   414→            <Card className="p-5 border-primary/30 bg-primary/5">
+   415→              <div className="flex items-center justify-between mb-3">
+   416→                <p className="font-semibold flex items-center gap-2"><Send className="h-4 w-4 text-primary" /> Submission Workspace</p>
+   417→                {draftSaved && <Badge variant="secondary" className="text-[10px] gap-1"><CheckCircle2 className="h-3 w-3" /> Draft saved {fmtRelative(draftSaved)}</Badge>}
+   418→              </div>
+   419→              {/* Requirements checklist */}
+   420→              {(() => {
+   421→                let reqs: { item: string; required: boolean }[] = []
+   422→                try { reqs = JSON.parse((task as any).requirements || '[]') } catch { reqs = [] }
+   423→                if (reqs.length === 0) return null
+   424→                return (
+   425→                  <div className="mb-4 rounded-lg bg-card border p-3">
+   426→                    <p className="text-xs font-semibold mb-2">Requirements Checklist</p>
+   427→                    <div className="space-y-1.5">
+   428→                      {reqs.map((r, i) => (
+   429→                        <label key={i} className="flex items-center gap-2 text-sm cursor-pointer">
+   430→                          <input type="checkbox" className="rounded" />
+   431→                          <span className={r.required ? 'font-medium' : 'text-muted-foreground'}>{r.item}</span>
+   432→                          {r.required && <Badge variant="outline" className="text-[9px] text-rose-600">Required</Badge>}
+   433→                        </label>
+   434→                      ))}
+   435→                    </div>
+   436→                  </div>
+   437→                )
+   438→              })()}
+   439→              {/* Files */}
+   440→              <div className="space-y-1.5 mb-3">
+   441→                <Label className="text-xs">Files (comma-separated filenames)</Label>
+   442→                <Input value={draftFiles} onChange={(e) => setDraftFiles(e.target.value)} placeholder="report.pdf, code.zip, README.md" className="text-sm" />
+   443→              </div>
+   444→              {/* Links */}
+   445→              <div className="space-y-1.5 mb-3">
+   446→                <Label className="text-xs">Links (GitHub, Drive, Demo URLs — comma-separated)</Label>
+   447→                <Input value={draftLinks} onChange={(e) => setDraftLinks(e.target.value)} placeholder="https://github.com/user/repo, https://demo.app" className="text-sm" />
+   448→              </div>
+   449→              {/* Written explanation */}
+   450→              <div className="space-y-1.5 mb-3">
+   451→                <Label className="text-xs">Written Explanation</Label>
+   452→                <Textarea value={draftNote} onChange={(e) => setDraftNote(e.target.value)} placeholder="Describe what you delivered, your approach, and any notes for the reviewer…" rows={4} />
+   453→              </div>
+   454→              {/* Actions */}
+   455→              <div className="flex items-center gap-2 mt-4">
+   456→                {task.status === 'ASSIGNED' || task.status === 'ACCEPTED' ? (
+   457→                  <Button variant="outline" onClick={() => act('START')} disabled={acting}>Start Work</Button>
+   458→                ) : null}
+   459→                <Button variant="outline" onClick={saveDraft} disabled={submittingSub} className="gap-2">
+   460→                  {submittingSub ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Draft
+   461→                </Button>
+   462→                <Button onClick={() => setShowSubmitConfirm(true)} disabled={submittingSub || (!draftNote && !draftFiles && !draftLinks)} className="gap-2">
+   463→                  <Send className="h-4 w-4" /> Submit Final
+   464→                </Button>
+   465→              </div>
+   466→
+   467→              {/* Submit confirmation */}
+   468→              {showSubmitConfirm && (
+   469→                <div className="mt-4 rounded-lg border-2 border-primary/30 bg-card p-4 space-y-3">
+   470→                  <p className="font-semibold text-sm">Ready to submit?</p>
+   471→                  <div className="text-xs space-y-1 text-muted-foreground">
+   472→                    <p>Files: {draftFiles ? draftFiles.split(',').filter(Boolean).length : 0}</p>
+   473→                    <p>Links: {draftLinks ? draftLinks.split(',').filter(Boolean).length : 0}</p>
+   474→                    <p>Explanation: {draftNote ? 'Completed' : 'Empty'}</p>
+   475→                    <p>Deadline: {task.deadline ? fmtDate(task.deadline, 'd MMM yyyy · h:mm a') : '—'}</p>
+   476→                  </div>
+   477→                  <div className="flex gap-2">
+   478→                    <Button variant="outline" size="sm" onClick={() => setShowSubmitConfirm(false)}>Back to Edit</Button>
+   479→                    <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700" onClick={submitFinal} disabled={submittingSub}>
+   480→                      {submittingSub ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Submit Final
+   481→                    </Button>
+   482→                  </div>
+   483→                </div>
+   484→              )}
+   485→            </Card>
+   486→          ) : task.submissionNote && (task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW' || task.status === 'APPROVED' || task.status === 'COMPLETED') ? (
+   487→            <Card className="p-5">
+   488→              <p className="font-semibold mb-2 flex items-center gap-2"><Send className="h-4 w-4 text-primary" /> Submission</p>
+   489→              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{task.submissionNote}</p>
+   490→              {task.submittedAt && <p className="text-xs text-muted-foreground mt-3">Submitted {fmtRelative(task.submittedAt)}</p>}
+   491→            </Card>
+   492→          ) : null}
+   493→
+   494→          {/* Submission Version History */}
+   495→          {submissions.length > 0 && (
+   496→            <Card className="p-5">
+   497→              <p className="font-semibold mb-3 flex items-center gap-2"><Clock className="h-4 w-4 text-muted-foreground" /> Submission History ({submissions.length} version{submissions.length > 1 ? 's' : ''})</p>
+   498→              <div className="space-y-2">
+   499→                {submissions.map((s) => (
+   500→                  <div key={s.id} className="flex items-start gap-3 rounded-lg border border-border p-3">
+   501→                    <div className="flex flex-col items-center shrink-0">
+   502→                      <div className={`h-8 w-8 rounded-full grid place-items-center text-xs font-bold ${s.status === 'APPROVED' ? 'bg-emerald-500/15 text-emerald-600' : s.status === 'CHANGES_REQUESTED' ? 'bg-amber-500/15 text-amber-600' : s.status === 'DRAFT' ? 'bg-zinc-400/15 text-zinc-500' : 'bg-sky-500/15 text-sky-600'}`}>
+   503→                        v{s.version}
+   504→                      </div>
+   505→                    </div>
+   506→                    <div className="min-w-0 flex-1">
+   507→                      <div className="flex items-center gap-2 flex-wrap">
+   508→                        <Badge variant="outline" className="text-[10px]">{s.status.replace(/_/g, ' ').toLowerCase()}</Badge>
+   509→                        {s.managerScore != null && <Badge variant="outline" className="text-[10px] bg-emerald-500/15 text-emerald-600">Score: {s.managerScore}</Badge>}
+   510→                      </div>
+   511→                      {s.submissionNote && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{s.submissionNote}</p>}
+   512→                      <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+   513→                        {s.files && <span>📎 {s.files.split(',').filter(Boolean).length} files</span>}
+   514→                        {s.links && <span>🔗 {s.links.split(',').filter(Boolean).length} links</span>}
+   515→                        {s.submittedAt && <span>· {fmtDate(s.submittedAt, 'd MMM · h:mm a')}</span>}
+   516→                      </div>
+   517→                      {s.managerFeedback && <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1 italic">Feedback: {s.managerFeedback}</p>}
+   518→                    </div>
+   519→                  </div>
+   520→                ))}
+   521→              </div>
+   522→            </Card>
+   523→          )}
+   524→
+   525→          {/* AI Evaluation */}
+   526→          {(task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW' || task.status === 'APPROVED' || task.status === 'COMPLETED') && (
+   527→            <Card className="p-5 border-violet-500/30">
+   528→              <div className="flex items-center justify-between mb-3">
+   529→                <p className="font-semibold flex items-center gap-2"><Bot className="h-4 w-4 text-violet-600" /> AI Task Evaluation</p>
+   530→                {canEvaluate && task.status === 'SUBMITTED' && (
+   531→                  <Button size="sm" variant="outline" onClick={runAIEval} disabled={aiLoading} className="gap-1.5 border-violet-500/30 text-violet-600 hover:bg-violet-500/10">
+   532→                    {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} {task.aiScore !== null ? 'Re-run' : 'Run'} AI Review
+   533→                  </Button>
+   534→                )}
+   535→              </div>
+   536→              {task.aiScore !== null && task.aiScore !== undefined ? (
+   537→                <div>
+   538→                  <div className="flex items-center gap-4 mb-4">
+   539→                    <div className="relative h-16 w-16">
+   540→                      <svg className="h-16 w-16 -rotate-90" viewBox="0 0 36 36">
+   541→                        <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted" />
+   542→                        <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeWidth="3" strokeDasharray={`${task.aiScore}, 100`} strokeLinecap="round" className="text-violet-600" />
+   543→                      </svg>
+   544→                      <div className="absolute inset-0 grid place-items-center">
+   545→                        <div className="text-center">
+   546→                          <p className="text-lg font-bold leading-none">{task.aiScore}</p>
+   547→                          <p className="text-[8px] text-muted-foreground">AI</p>
+   548→                        </div>
+   549→                      </div>
+   550→                    </div>
+   551→                    <div>
+   552→                      <p className="text-sm font-medium">Preliminary AI Score</p>
+   553→                      <p className="text-xs text-muted-foreground">AI provides an initial assessment. Manager makes the final decision.</p>
+   554→                    </div>
+   555→                  </div>
+   556→                  {task.aiFeedback && (
+   557→                    <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
+   558→                      <pre className="whitespace-pre-wrap font-sans bg-transparent p-0 text-sm leading-relaxed">{task.aiFeedback}</pre>
+   559→                    </div>
+   560→                  )}
+   561→                </div>
+   562→              ) : (
+   563→                <div className="text-center py-6">
+   564→                  <Bot className="h-10 w-10 mx-auto mb-2 text-violet-400" />
+   565→                  <p className="text-sm text-muted-foreground">AI evaluation will analyze the submission against deliverables & criteria.</p>
+   566→                  <p className="text-xs text-muted-foreground mt-1">Provides preliminary score, strengths, weaknesses & suggestions.</p>
+   567→                </div>
+   568→              )}
+   569→            </Card>
+   570→          )}
+   571→
+   572→          {/* Manager review */}
+   573→          {canReview && (task.status === 'SUBMITTED' || task.status === 'UNDER_REVIEW') && (
+   574→            <Card className="p-5 border-emerald-500/30 bg-emerald-500/5">
+   575→              <p className="font-semibold mb-3 flex items-center gap-2"><Award className="h-4 w-4 text-emerald-600" /> Manager Review</p>
+   576→              <div className="space-y-3">
+   577→                <div>
+   578→                  <Label className="text-xs">Your Score: <span className="font-bold text-emerald-600">{managerScore}</span></Label>
+   579→                  <input type="range" min={0} max={100} value={managerScore} onChange={(e) => setManagerScore(parseInt(e.target.value))} className="w-full mt-1 accent-emerald-600" />
+   580→                </div>
+   581→                <Textarea value={managerFeedback} onChange={(e) => setManagerFeedback(e.target.value)} placeholder="Your feedback to the employee…" rows={3} />
+   582→                <div className="flex gap-2">
+   583→                  <Button onClick={() => act('APPROVE', { managerScore, managerFeedback })} disabled={acting} className="gap-2 bg-emerald-600 hover:bg-emerald-700"><CheckCircle2 className="h-4 w-4" /> Approve</Button>
+   584→                  <Button onClick={() => act('COMPLETE', { managerScore, managerFeedback })} disabled={acting} variant="outline" className="gap-2"><Star className="h-4 w-4" /> Complete</Button>
+   585→                </div>
+   586→              </div>
+   587→            </Card>
+   588→          )}
+   589→
+   590→          {task.managerScore !== null && task.managerScore !== undefined && (
+   591→            <Card className="p-5 border-emerald-500/30">
+   592→              <p className="font-semibold mb-3 flex items-center gap-2"><Award className="h-4 w-4 text-emerald-600" /> Manager Decision</p>
+   593→              <div className="flex items-center gap-4">
+   594→                <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 text-emerald-600 grid place-items-center">
+   595→                  <span className="text-xl font-bold">{task.managerScore}</span>
+   596→                </div>
+   597→                <div>
+   598→                  <p className="text-sm font-medium">Final Score</p>
+   599→                  <p className="text-xs text-muted-foreground">By {currentEmployee?.name}</p>
+   600→                </div>
+   601→              </div>
+   602→              {task.managerFeedback && <p className="text-sm text-muted-foreground mt-3 pt-3 border-t">{task.managerFeedback}</p>}
+   603→            </Card>
+   604→          )}
+   605→        </div>
+   606→
+   607→        {/* Sidebar */}
+   608→        <div className="space-y-4">
+   609→          {task.assignee && (
+   610→            <Card className="p-4">
+   611→              <p className="text-xs text-muted-foreground mb-2">ASSIGNED TO</p>
+   612→              <div className="flex items-center gap-3">
+   613→                <Avatar className="h-10 w-10"><AvatarImage src={task.assignee.photoUrl} /><AvatarFallback>{initials(task.assignee.name)}</AvatarFallback></Avatar>
+   614→                <div><p className="text-sm font-medium">{task.assignee.name}</p><p className="text-xs text-muted-foreground">{task.assignee.designation}</p></div>
+   615→              </div>
+   616→            </Card>
+   617→          )}
+   618→          <Card className="p-4">
+   619→            <p className="text-xs text-muted-foreground mb-3">TASK LIFECYCLE</p>
+   620→            <div className="space-y-2">
+   621→              {COLUMNS.map((c, i) => {
+   622→                const reached = COLUMNS.findIndex((x) => x.id === task.status) >= i
+   623→                return (
+   624→                  <div key={c.id} className="flex items-center gap-2">
+   625→                    <div className={`h-2 w-2 rounded-full ${reached ? c.color : 'bg-muted'}`} />
+   626→                    <span className={`text-xs ${reached ? 'font-medium' : 'text-muted-foreground'}`}>{c.label}</span>
+   627→                  </div>
+   628→                )
+   629→              })}
+   630→            </div>
+   631→          </Card>
+   632→        </div>
+   633→      </div>
+   634→    </div>
+   635→  )
+   636→}
+   637→
