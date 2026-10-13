@@ -192,10 +192,9 @@ Contributions are welcome!
 
 <div align="center">
 
-**Siddhesh Salve (Hastar)**
+**Vijayshree Sundge**
 
-[![GitHub](https://img.shields.io/badge/GitHub-siddheshsalve77-181717?style=for-the-badge&logo=github)](https://github.com/siddheshsalve77)
-[![Portfolio](https://img.shields.io/badge/Portfolio-Visit-8B5CF6?style=for-the-badge&logo=vercel&logoColor=white)](https://siddhesh-salve-portfolio.vercel.app)
+[![GitHub](https://img.shields.io/badge/GitHub-vijayshree--sundge-181717?style=for-the-badge&logo=github)](https://github.com/vijayshree-sundge)
 
 ⭐ **If you found this project useful, please give it a star!** ⭐
 
